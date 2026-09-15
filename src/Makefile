@@ -156,11 +156,9 @@ ADEFS = -DF_CPU=$(F_CPU) -DXTEA_ENC
 # Default options values, no manual flag overidden because of incompatibilites
 # Incompatibilities handled below with $(error ...)
 # Define RFM to 0 to disable support for the RFM Radio Moodule in the Code
-ifeq ($(HW),THERMOTRONIC)
- RFM?=0
-else
- RFM?=1
-endif
+# This fork defaults to a standalone thermostat. Radio targets in the top-level
+# Makefile pass RFM=1 explicitly.
+RFM?=0
 # Set default baud rate for RFM
 RFM_BAUD_RATE?=19200
 # Set default HR slave address, valid range is 1-28
@@ -190,6 +188,7 @@ NO_AUTORETURN_FROM_ALT_MENUES?=0
 CALIBRATION_RESETS_sumError?=0
 BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE?=0
 BOOST_CONTROLER_AFTER_CHANGE?=0
+MOTOR_AUTO_RESYNC?=1
 ifeq ($(RFM),1)
  RFM_WIRE?=JD_INTERNAL
 endif
@@ -270,6 +269,7 @@ CFLAGS += -DCALIBRATION_RESETS_sumError=$(CALIBRATION_RESETS_sumError)
 CFLAGS += -DREMOTE_SETTING_ONLY=$(REMOTE_SETTING_ONLY)
 CFLAGS += -DBLOCK_INTEGRATOR_AFTER_VALVE_CHANGE=$(BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE)
 CFLAGS += -DBOOST_CONTROLER_AFTER_CHANGE=$(BOOST_CONTROLER_AFTER_CHANGE)
+CFLAGS += -DMOTOR_AUTO_RESYNC=$(MOTOR_AUTO_RESYNC)
 ifeq ($(RFM_WIRE),MARIOJTAG)
  CFLAGS += -DRFM_WIRE_MARIOJTAG=1
 else
@@ -421,7 +421,11 @@ AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 # to submit bug reports.
 #AVRDUDE_VERBOSE = -v -v
 
-AVRDUDE_FLAGS = -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER) $(AVRDUDE_DELAY)
+# avr-gcc and avrdude use different part naming conventions.
+MCU_TO_PART=$(patsubst atmega%,m%,$(patsubst attiny%,t%,$1))
+AVRDUDE_PART = $(call MCU_TO_PART,$(MCU))
+
+AVRDUDE_FLAGS = -p $(AVRDUDE_PART) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER) $(AVRDUDE_DELAY)
 AVRDUDE_FLAGS += $(AVRDUDE_NO_VERIFY)
 AVRDUDE_FLAGS += $(AVRDUDE_VERBOSE)
 AVRDUDE_FLAGS += $(AVRDUDE_ERASE_COUNTER)
@@ -648,6 +652,7 @@ extcoff: $(TARGET).elf
 	@echo "CALIBRATION_RESETS_sumError=$(CALIBRATION_RESETS_sumError)" >> $@
 	@echo "BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE=$(BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE)" >> $@
 	@echo "BOOST_CONTROLER_AFTER_CHANGE=$(BOOST_CONTROLER_AFTER_CHANGE)" >> $@
+	@echo "MOTOR_AUTO_RESYNC=$(MOTOR_AUTO_RESYNC)" >> $@
 	@echo "RFM_WIRE=$(RFM_WIRE)" >> $@
 	@echo "DISABLE_JTAG=$(DISABLE_JTAG)" >> $@
 	@echo "==================================" >> $@

@@ -76,6 +76,14 @@ static uint8_t ring_used = 1;
 static int32_t ring_sum [2] = { 0, 0 };
 int16_t ring_average [2] = { 0, 0 };
 
+#define BATTERY_READY_SAMPLES 4
+static uint8_t battery_valid_samples = 0;
+
+bool ADC_BatteryReady(void)
+{
+	return battery_valid_samples >= BATTERY_READY_SAMPLES;
+}
+
 static void shift_ring(void)
 {
 	ring_pos = (ring_pos + 1) % AVERAGE_LEN;
@@ -221,6 +229,10 @@ REPEAT_ADC:
 		COM_printStr16(PSTR("batAD x"), ad);
 #endif
 		update_ring(BAT_RING_TYPE, ADC_Get_Bat_Voltage(ad));
+		if (battery_valid_samples < BATTERY_READY_SAMPLES)
+		{
+			battery_valid_samples++;
+		}
 
 		// activate voltage divider
 		ADC_ACT_TEMP_P |= (1 << ADC_ACT_TEMP);

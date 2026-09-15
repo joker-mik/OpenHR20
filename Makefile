@@ -39,7 +39,9 @@ export RFM_FREQ_FINE=0.35
 
 #############
 
-default: HR20_rfm_int_sww rfm_master
+# Safe default for this fork: plain Honeywell HR20 without radio.
+# Radio builds remain available through their explicit targets and `make all`.
+default: HR20_original_sww
 
 all: HR20_rfm_int_sww HR20_rfm_int_hww HR20_rfm_ext_sww HR20_original_sww HR20_original_hww HR25_original_sww HR25_rfm_int_sww thermotronic_sww rfm_master
 	 cp src/license.txt $(DEST)/
@@ -72,6 +74,7 @@ HR20_rfm_int_sww:
 		TARGET=../$(DEST)/$@/hr20 \
 		OBJDIR=$@ \
 		HW_WINDOW_DETECTION=0 \
+		RFM=1 \
 		REV=-DREVISION=\\\"$(REV)\\\"
 
 HR20_rfm_int_hww:
@@ -80,6 +83,7 @@ HR20_rfm_int_hww:
 		TARGET=../$(DEST)/$@/hr20 \
 		OBJDIR=$@ \
 		HW_WINDOW_DETECTION=1 \
+		RFM=1 \
 		REV=-DREVISION=\\\"$(REV)\\\"
 
 HR20_rfm_ext_sww:
@@ -88,6 +92,7 @@ HR20_rfm_ext_sww:
 		TARGET=../$(DEST)/$@/hr20 \
 		OBJDIR=$@ \
 		HW_WINDOW_DETECTION=0\
+		RFM=1 \
 		RFM_WIRE=MARIOJTAG \
 		REV=-DREVISION=\\\"$(REV)\\\"
 
@@ -126,6 +131,7 @@ HR25_rfm_int_sww:
 		OBJDIR=$@ \
 		HW_WINDOW_DETECTION=0 \
 		RFM_WIRE=TK_INTERNAL \
+		RFM=1 \
 		HW=HR25 \
 		REV=-DREVISION=\\\"$(REV)\\\"
 

@@ -88,6 +88,47 @@ bool reboot = false;
 #warning "This code has not been tested with older versions."
 #endif
 
+#if MOTOR_AUTO_RESYNC
+#define MOTOR_RESYNC_OVER_TEMP        100        /* 1.00 C, temp unit is 0.01 C */
+#define MOTOR_RESYNC_MINUTES          15
+#define MOTOR_RESYNC_COOLDOWN_MINUTES (12 * 60)
+
+static uint16_t motor_resync_cooldown = 0;
+static uint8_t motor_resync_minutes = 0;
+
+static void motor_resync_update(void)
+{
+	if (motor_resync_cooldown > 0)
+	{
+		motor_resync_cooldown--;
+	}
+
+	if ((motor_resync_cooldown != 0)
+	    || MOTOR_CloseReferenceActive()
+	    || !MOTOR_IsCalibrated()
+	    || (MOTOR_Dir != stop)
+	    || mode_window()
+	    || (CTL_error & (CTL_ERR_MOTOR | CTL_ERR_MONTAGE | CTL_ERR_BATT_WARNING | CTL_ERR_BATT_LOW))
+	    || (CTL_temp_wanted < TEMP_MIN)
+	    || (CTL_temp_wanted > TEMP_MAX)
+	    || (valve_wanted > config.valve_min)
+	    || (temp_average < ((int16_t)CTL_temp_wanted * 50 + MOTOR_RESYNC_OVER_TEMP)))
+	{
+		motor_resync_minutes = 0;
+		return;
+	}
+
+	if (++motor_resync_minutes >= MOTOR_RESYNC_MINUTES)
+	{
+		if (MOTOR_StartCloseReference())
+		{
+			motor_resync_cooldown = MOTOR_RESYNC_COOLDOWN_MINUTES;
+		}
+		motor_resync_minutes = 0;
+	}
+}
+#endif
+
 /*!
  *******************************************************************************
  * main program
@@ -125,8 +166,8 @@ int __attribute__ ((noreturn)) main(void)
 	rfm_mode = rfmmode_rx;
 #endif
 
-	// We should do the following once here to have valid data from the start
-
+	// Start ADC immediately; motor movement waits for qualified battery data.
+	start_task_ADC();
 
 	/*!
 	 ****************************************************************************
@@ -289,6 +330,9 @@ int __attribute__ ((noreturn)) main(void)
 #if RFM
 					wirelesTimeSyncCheck();
 #endif
+#if MOTOR_AUTO_RESYNC
+					motor_resync_update();
+#endif
 				}
 #if RFM
 				if ((config.RFM_devaddr != 0) && (time_sync_tmo > 1))
@@ -329,7 +373,7 @@ int __attribute__ ((noreturn)) main(void)
 					}
 				}
 #endif
-				if (bat_average > 0)
+				if (ADC_BatteryReady())
 				{
 					MOTOR_updateCalibration(mont_contact_pooling());
 					MOTOR_Goto(valve_wanted);

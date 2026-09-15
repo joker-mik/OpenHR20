@@ -72,6 +72,10 @@ static volatile uint16_t motor_timer = 0;
 static volatile uint16_t last_eye_change = 0;
 static volatile uint16_t longest_low_eye = 0;
 
+static bool MOTOR_close_reference_active = false;
+uint8_t MOTOR_close_reference_count = 0;
+int16_t MOTOR_last_close_reference_delta = 0;
+
 
 static void MOTOR_Control(motor_dir_t); // control H-bridge of motor
 
@@ -101,6 +105,7 @@ void MOTOR_updateCalibration(uint8_t cal_type)
 			display_task = DISP_TASK_CLEAR | DISP_TASK_UPDATE;
 		}
 		MOTOR_calibration_step = -2;    // not calibrated
+		MOTOR_close_reference_active = false;
 		MOTOR_wait_for_new_calibration = 5;
 		CTL_clear_error(CTL_ERR_MOTOR);
 #if CALIBRATION_RESETS_sumError
@@ -213,6 +218,25 @@ void MOTOR_Goto(uint8_t percent)
 			}
 		}
 	}
+}
+
+/* Re-reference the physical closed end stop while preserving full travel. */
+uint8_t MOTOR_StartCloseReference(void)
+{
+	if (!MOTOR_IsCalibrated() || MOTOR_run_test() || MOTOR_eye_test())
+	{
+		return false;
+	}
+
+	MOTOR_close_reference_active = true;
+	MOTOR_PosStop = MOTOR_PosAct - MOTOR_MAX_IMPULSES;
+	MOTOR_Control(close);
+	return true;
+}
+
+uint8_t MOTOR_CloseReferenceActive(void)
+{
+	return MOTOR_close_reference_active;
 }
 
 /*!
@@ -384,6 +408,12 @@ void MOTOR_timer_stop(void)
 	MOTOR_Control(stop);
 	if (motor_timer > 0)                            // normal stop on wanted position
 	{
+		if (MOTOR_close_reference_active)
+		{
+			MOTOR_close_reference_active = false;
+			CTL_set_error(CTL_ERR_MOTOR);
+			return;
+		}
 		if (MOTOR_calibration_step != 0)
 		{
 			MOTOR_calibration_step = -1;    // calibration error
@@ -441,6 +471,22 @@ void MOTOR_timer_stop(void)
 		}
 		else if (d == close)     // stopped on end
 		{
+			if (MOTOR_close_reference_active)
+			{
+				MOTOR_close_reference_active = false;
+				/* Do not turn a jam far from zero into a false reference. */
+				if (MOTOR_PosAct <= MOTOR_MIN_IMPULSES)
+				{
+					MOTOR_last_close_reference_delta = MOTOR_PosAct;
+					MOTOR_PosAct = 0;
+					MOTOR_close_reference_count++;
+				}
+				else
+				{
+					CTL_set_error(CTL_ERR_MOTOR);
+				}
+			}
+			else
 			{
 				if (MOTOR_calibration_step == 3)
 				{
@@ -568,6 +614,11 @@ ISR(TIMER0_OVF_vect)
 		MOTOR_eye_disable();
 		task &= ~(TASK_MOTOR_PULSE);    // just ensurance
 		MOTOR_H_BRIDGE_stop();          // ensurance that motor is stop
+		if (MOTOR_close_reference_active)
+		{
+			motor_timer = 0;
+			task |= TASK_MOTOR_STOP;
+		}
 	}
 	else
 	{

@@ -48,6 +48,7 @@
 #include "eeprom.h"
 #include "controller.h"
 #include "menu.h"
+#include "motor.h"
 #include "common/wireless.h"
 #include "debug.h"
 
@@ -334,6 +335,10 @@ void COM_print_debug(uint8_t type)
 	COM_putchar((CTL_mode_auto) ? (CTL_test_auto() ? 'A' : '-') : 'M');
 	print_s_p(PSTR(" V: "));
 	print_decXX(valve_wanted);
+	print_s_p(PSTR(" P: "));
+	print_decXX(MOTOR_GetPosPercent());
+	print_s_p(PSTR(" R: "));
+	print_decXX(MOTOR_close_reference_count);
 	print_s_p(PSTR(" I: "));
 	print_decXXXX(temp_average);
 	print_s_p(PSTR(" S: "));

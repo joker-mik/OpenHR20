@@ -75,6 +75,7 @@
 
 bool task_ADC(void);
 void start_task_ADC(void);
+bool ADC_BatteryReady(void);
 
 
 extern bool sleep_with_ADC;
