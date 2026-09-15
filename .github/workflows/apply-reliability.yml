@@ -23,6 +23,11 @@ jobs:
       - name: Apply reliability changes
         run: python3 tools/apply_reliability.py
 
+      - name: Apply legacy type compatibility
+        run: |
+          sed -i 's/^bool MOTOR_StartCloseReference/uint8_t MOTOR_StartCloseReference/' src/motor.h src/motor.c
+          sed -i 's/^bool MOTOR_CloseReferenceActive/uint8_t MOTOR_CloseReferenceActive/' src/motor.h src/motor.c
+
       - name: Install AVR toolchain
         run: |
           sudo apt-get update -qq
