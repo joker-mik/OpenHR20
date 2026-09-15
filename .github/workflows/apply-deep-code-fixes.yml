@@ -1,0 +1,304 @@
+name: Apply deep reliability fixes
+
+on:
+  push:
+    branches:
+      - reliability-improvements
+    paths:
+      - .github/workflows/apply-deep-code-fixes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: reliability-improvements
+          fetch-depth: 0
+
+      - name: Apply fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace(path, old, new, expected=1):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{path}: expected {expected} occurrences, found {count}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, expected))
+
+          # Timer menu: never use disabled timer value 24 as an hour-bar index.
+          replace("src/menu.c",
+                  "\t\tLCD_SetHourBarSeg(menu_set_time / 60, lcd_blink_mode);\n\t\tLCD_SetSeg(LCD_SEG_COL1, lcd_blink_mode);",
+                  "\t\tLCD_SetSeg(LCD_SEG_COL1, lcd_blink_mode);")
+          replace("src/menu.c",
+                  "\t\tif (menu_set_time < 24 * 60)\n\t\t{\n\t\t\tLCD_PrintDec(menu_set_time / 60, 2, lcd_blink_mode);",
+                  "\t\tif (menu_set_time < 24 * 60)\n\t\t{\n\t\t\tLCD_SetHourBarSeg(menu_set_time / 60, lcd_blink_mode);\n\t\t\tLCD_PrintDec(menu_set_time / 60, 2, lcd_blink_mode);")
+          replace("src/menu.c",
+                  "\t\t\teeprom_config_save(menu_state + ((temperature_table - config_raw) - menu_preset_temp0));",
+                  "\t\t\teeprom_config_save((uint8_t)(OFFSETOF(config_t, temperature0) + (menu_state - menu_preset_temp0)));")
+
+          # Defensive LCD bounds checks.
+          replace("src/lcd.c",
+                  "void LCD_SetHourBarSeg(uint8_t seg, uint8_t mode)\n{\n\tuint8_t segment;",
+                  "void LCD_SetHourBarSeg(uint8_t seg, uint8_t mode)\n{\n\tuint8_t segment;\n\n\tif (seg >= 24)\n\t{\n\t\treturn;\n\t}")
+          replace("src/lcd.c",
+                  "void LCD_SetSeg(uint8_t seg, uint8_t mode)\n{\n\tLCD_SetSegReg(seg / 8, 1 << (seg % 8), mode);",
+                  "void LCD_SetSeg(uint8_t seg, uint8_t mode)\n{\n\tif (seg >= LCD_REGISTER_COUNT * 8)\n\t{\n\t\treturn;\n\t}\n\tLCD_SetSegReg(seg / 8, 1 << (seg % 8), mode);")
+
+          # Track how many 15-second software-window samples are valid.
+          replace("src/adc.c",
+                  "int16_t ring_buf_temp_avgs [AVGS_BUFFER_LEN];\nuint8_t ring_buf_temp_avgs_pos = 0;",
+                  "int16_t ring_buf_temp_avgs [AVGS_BUFFER_LEN];\nuint8_t ring_buf_temp_avgs_pos = 0;\nuint8_t ring_buf_temp_avgs_used = 0;")
+          replace("src/adc.c",
+                  "\t\tring_buf_temp_avgs[ring_buf_temp_avgs_pos] = temp_average;\n\t\tring_buf_temp_avgs_pos = (ring_buf_temp_avgs_pos + 1) % AVGS_BUFFER_LEN;",
+                  "\t\tring_buf_temp_avgs[ring_buf_temp_avgs_pos] = temp_average;\n\t\tring_buf_temp_avgs_pos = (ring_buf_temp_avgs_pos + 1) % AVGS_BUFFER_LEN;\n\t\tif (ring_buf_temp_avgs_used < AVGS_BUFFER_LEN)\n\t\t{\n\t\t\tring_buf_temp_avgs_used++;\n\t\t}")
+          replace("src/adc.h",
+                  "extern uint8_t ring_buf_temp_avgs_pos;",
+                  "extern uint8_t ring_buf_temp_avgs_pos;\nextern uint8_t ring_buf_temp_avgs_used;")
+
+          # Never divide by zero on a failed battery ADC conversion and never qualify it.
+          replace("src/adc.c",
+                  "static int16_t ADC_Get_Bat_Voltage(uint16_t adc)             // Get Batteriy Voltage in mV\n{\n\tuint32_t millivolt;",
+                  "static int16_t ADC_Get_Bat_Voltage(uint16_t adc)             // Get Batteriy Voltage in mV\n{\n\tuint32_t millivolt;\n\n\tif (adc == 0)\n\t{\n\t\treturn 0;\n\t}")
+          replace("src/adc.c",
+                  "\t\tupdate_ring(BAT_RING_TYPE, ADC_Get_Bat_Voltage(ad));\n\t\tif (battery_valid_samples < BATTERY_READY_SAMPLES)\n\t\t{\n\t\t\tbattery_valid_samples++;\n\t\t}",
+                  "\t\tif (ad != 0)\n\t\t{\n\t\t\tupdate_ring(BAT_RING_TYPE, ADC_Get_Bat_Voltage(ad));\n\t\t\tif (battery_valid_samples < BATTERY_READY_SAMPLES)\n\t\t\t{\n\t\t\t\tbattery_valid_samples++;\n\t\t\t}\n\t\t}")
+
+          # Software window detection: inspect exactly N valid historical samples, ending at pos-1.
+          p = Path("src/controller.c")
+          text = p.read_text()
+          pattern = re.compile(
+              r"\tuint8_t i = \(ring_buf_temp_avgs_pos \+ AVGS_BUFFER_LEN\n"
+              r".*?"
+              r"\n\t\}\n(?=\tif \(\(temp_average - min\))",
+              re.S)
+          replacement = """\tuint8_t count = ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time);
+\tuint8_t i;
+\tint16_t min;
+\tint16_t max;
+
+\tif ((count == 0) || (ring_buf_temp_avgs_used < count))
+\t{
+\t\treturn;
+\t}
+
+\ti = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN - count) % AVGS_BUFFER_LEN;
+\tmin = ring_buf_temp_avgs[i];
+\tmax = min;
+\twhile (--count)
+\t{
+\t\tint16_t x;
+\t\ti = (i + 1) % AVGS_BUFFER_LEN;
+\t\tx = ring_buf_temp_avgs[i];
+\t\tif (x < min) min = x;
+\t\tif (x > max) max = x;
+\t}
+"""
+          text, n = pattern.subn(replacement, text)
+          if n != 2:
+              raise SystemExit(f"src/controller.c: expected 2 software-window sampling blocks, found {n}")
+          p.write_text(text)
+
+          # Give PE2's pull-up settling time by enabling it at the start of the 1-second controller pass.
+          replace("src/controller.c",
+                  "#if (HW_WINDOW_DETECTION) && !WINDOW_DETECTION_RUNTIME\n\tPORTE |= _BV(PE2); // enable pull-up\n#endif",
+                  "#if WINDOW_DETECTION_RUNTIME\n\tif (config.window_detection_mode == WINDOW_DETECTION_HARDWARE)\n\t{\n\t\tPORTE |= _BV(PE2); // enable pull-up early so PE2 can settle before sampling\n\t}\n#elif HW_WINDOW_DETECTION\n\tPORTE |= _BV(PE2); // enable pull-up\n#endif")
+
+          # RTC: validate timer IDs, remove uninitialized reads, avoid out-of-range EEPROM reads,
+          # and fix the October last-Sunday calculation.
+          replace("common/rtc.c",
+                  "\tint8_t raw_index = RTC_FindTimerRawIndex(dow, minutes);\n\tuint16_t data = eeprom_timers_read_raw(raw_index);\n\n\tif (raw_index < 0)\n\t{\n\t\treturn TEMP_TYPE_INVALID;            //not found\n\t}",
+                  "\tint8_t raw_index = RTC_FindTimerRawIndex(dow, minutes);\n\tuint16_t data;\n\n\tif (raw_index < 0)\n\t{\n\t\treturn TEMP_TYPE_INVALID;            //not found\n\t}\n\tdata = eeprom_timers_read_raw((uint8_t)raw_index);")
+          replace("common/rtc.c",
+                  "\t\treturn RTC.DD > (30 - 7);",
+                  "\t\treturn RTC.DD > (31 - 7);")
+          replace("common/rtc.c",
+                  "\tuint8_t t2, i, next, dif;\n\n\t// next is uninitialized, it is correct\n\n\tcli();\n\tRTC_timer_todo |= _BV(timer_id);",
+                  "\tuint8_t t2, i, next, dif;\n\tuint8_t sreg;\n\n\tif ((timer_id == 0) || (timer_id > RTC_TIMERS))\n\t{\n\t\treturn;\n\t}\n\n\tsreg = SREG;\n\tcli();\n\tRTC_timer_todo |= _BV(timer_id);")
+          replace("common/rtc.c",
+                  "\tt2 = TCNT2;\n\tdif = 255;",
+                  "\tt2 = TCNT2;\n\tnext = t2;\n\tdif = 255;", expected=1)
+          replace("common/rtc.c",
+                  "\tsei();\n#if !defined(MASTER_CONFIG_H)\n\tTIMSK2 |= (1 << OCIE2A); // enable interupt again",
+                  "\tSREG = sreg;\n#if !defined(MASTER_CONFIG_H)\n\tTIMSK2 |= (1 << OCIE2A); // enable interupt again")
+          replace("common/rtc.c",
+                  "\tuint8_t i, next;  // next is uninitialized, it is correct",
+                  "\tuint8_t i, next = t2;")
+          replace("common/rtc.c",
+                  "\t\tuint8_t next;\n\t\tfor (i = 0; i < RTC_TIMERS; i++)",
+                  "\t\tuint8_t next = RTC_s100;\n\t\tfor (i = 0; i < RTC_TIMERS; i++)")
+
+          # EEPROM: bounds-check timer reads and preserve the caller's interrupt state.
+          replace("common/eeprom.c",
+                  "void EEPROM_write(uint16_t address, uint8_t data)\n{\n\t/* Wait for completion of previous write */",
+                  "void EEPROM_write(uint16_t address, uint8_t data)\n{\n\tuint8_t sreg;\n\n\t/* Wait for completion of previous write */")
+          replace("common/eeprom.c",
+                  "\tEEAR = address;\n\tEEDR = data;\n\tasm (\"cli\");\n\tEECR |= (1 << EEMWE);\n\tEECR |= (1 << EEWE);\n\tasm (\"sei\");",
+                  "\tEEAR = address;\n\tEEDR = data;\n\tsreg = SREG;\n\tcli();\n\tEECR |= (1 << EEMWE);\n\tEECR |= (1 << EEWE);\n\tSREG = sreg;")
+          replace("common/eeprom.c",
+                  "uint16_t eeprom_timers_read_raw(uint8_t offset)\n{\n\tif (offset != timers_patch_offset)",
+                  "uint16_t eeprom_timers_read_raw(uint8_t offset)\n{\n\tif (offset >= (uint8_t)(sizeof(ee_timers) / sizeof(ee_timers[0][0])))\n\t{\n\t\treturn 0xffff;\n\t}\n\tif (offset != timers_patch_offset)")
+
+          # EEPROM migration: recover from a torn layout-byte write whenever a valid staging header exists.
+          p = Path("common/eeprom.c")
+          text = p.read_text()
+          old = """\tuint8_t old_layout = EEPROM_read((uint16_t)&ee_layout);
+\tuint8_t old_value[EE_MIG_OLD_COUNT];
+\tuint8_t i;
+\tbool staged;
+
+\tif (old_layout == EE_LAYOUT)
+\t{
+\t\treturn;
+\t}
+\tif ((old_layout != EE_LAYOUT_LEGACY_SOFTWARE) && (old_layout != EE_LAYOUT_LEGACY_HARDWARE))
+\t{
+\t\treturn;
+\t}
+
+\tstaged = (EEPROM_read((uint16_t)&ee_reserved2_60[0]) == EE_MIG_MAGIC0)
+\t\t && (EEPROM_read((uint16_t)&ee_reserved2_60[1]) == EE_MIG_MAGIC1)
+\t\t && (EEPROM_read((uint16_t)&ee_reserved2_60[2]) == old_layout);
+
+\tif (staged)
+\t{
+\t\tfor (i = 0; i < EE_MIG_OLD_COUNT; i++)
+\t\t{
+\t\t\told_value[i] = EEPROM_read((uint16_t)&ee_reserved2_60[3 + i]);
+\t\t}
+\t}
+\telse
+\t{
+"""
+          new = """\tuint8_t old_layout = EEPROM_read((uint16_t)&ee_layout);
+\tuint8_t staged_layout = EEPROM_read((uint16_t)&ee_reserved2_60[2]);
+\tuint8_t old_value[EE_MIG_OLD_COUNT];
+\tuint8_t i;
+\tbool staged;
+
+\tstaged = (EEPROM_read((uint16_t)&ee_reserved2_60[0]) == EE_MIG_MAGIC0)
+\t\t && (EEPROM_read((uint16_t)&ee_reserved2_60[1]) == EE_MIG_MAGIC1)
+\t\t && ((staged_layout == EE_LAYOUT_LEGACY_SOFTWARE) || (staged_layout == EE_LAYOUT_LEGACY_HARDWARE));
+
+\tif (old_layout == EE_LAYOUT)
+\t{
+\t\t/* A reset after committing ee_layout may leave only the scratch header behind. */
+\t\tif (staged)
+\t\t{
+\t\t\tEEPROM_write((uint16_t)&ee_reserved2_60[0], 0);
+\t\t\tEEPROM_write((uint16_t)&ee_reserved2_60[1], 0);
+\t\t}
+\t\treturn;
+\t}
+
+\tif (staged)
+\t{
+\t\t/* The staging copy is authoritative even if ee_layout was torn by power loss. */
+\t\told_layout = staged_layout;
+\t\tfor (i = 0; i < EE_MIG_OLD_COUNT; i++)
+\t\t{
+\t\t\told_value[i] = EEPROM_read((uint16_t)&ee_reserved2_60[3 + i]);
+\t\t}
+\t}
+\telse
+\t{
+\t\tif ((old_layout != EE_LAYOUT_LEGACY_SOFTWARE) && (old_layout != EE_LAYOUT_LEGACY_HARDWARE))
+\t\t{
+\t\t\treturn;
+\t\t}
+"""
+          if text.count(old) != 1:
+              raise SystemExit("common/eeprom.c: migration preamble not found")
+          p.write_text(text.replace(old, new, 1))
+
+          # UART configuration access: invalid config indexes must not read beyond config_t.
+          replace("src/com.c",
+                  "\t\t\tif (com_hex[0] == 0xff)\n\t\t\t{\n\t\t\t\tprint_hexXX(EE_LAYOUT);\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\tprint_hexXX(config_raw[com_hex[0]]);\n\t\t\t}",
+                  "\t\t\tif (com_hex[0] == 0xff)\n\t\t\t{\n\t\t\t\tprint_hexXX(EE_LAYOUT);\n\t\t\t}\n\t\t\telse if (com_hex[0] < CONFIG_RAW_SIZE)\n\t\t\t{\n\t\t\t\tprint_hexXX(config_raw[com_hex[0]]);\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\tprint_hexXX(0xff);\n\t\t\t}", expected=1)
+          # Same protection for the RFM command parser.
+          replace("src/com.c",
+                  "\t\t\tif (rfm_framebuf[pos] == 0xff)\n\t\t\t{\n\t\t\t\twireless_putchar(EE_LAYOUT);\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\twireless_putchar(config_raw[rfm_framebuf[pos]]);\n\t\t\t}",
+                  "\t\t\tif (rfm_framebuf[pos] == 0xff)\n\t\t\t{\n\t\t\t\twireless_putchar(EE_LAYOUT);\n\t\t\t}\n\t\t\telse if (rfm_framebuf[pos] < CONFIG_RAW_SIZE)\n\t\t\t{\n\t\t\t\twireless_putchar(config_raw[rfm_framebuf[pos]]);\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\twireless_putchar(0xff);\n\t\t\t}")
+
+          # Do not force-enable interrupts when COM helpers are called from an ISR/debug context.
+          replace("src/com.c",
+                  "void COM_putchar(char c)\n{\n\tcli();",
+                  "void COM_putchar(char c)\n{\n\tuint8_t sreg = SREG;\n\tcli();")
+          replace("src/com.c",
+                  "\tsei();\n}\n\n/*!\n *******************************************************************************\n *  \\brief support for interrupt for transmit bytes",
+                  "\tSREG = sreg;\n}\n\n/*!\n *******************************************************************************\n *  \\brief support for interrupt for transmit bytes", expected=1)
+          replace("src/com.c",
+                  "static char COM_getchar(void)\n{\n\tchar c;\n\n\tcli();",
+                  "static char COM_getchar(void)\n{\n\tchar c;\n\tuint8_t sreg = SREG;\n\n\tcli();")
+          replace("src/com.c",
+                  "\tsei();\n\treturn c;\n}",
+                  "\tSREG = sreg;\n\treturn c;\n}", expected=1)
+          replace("common/uart.c",
+                  "void UART_startSend(void)\n{\n\tcli();",
+                  "void UART_startSend(void)\n{\n\tuint8_t sreg = SREG;\n\tcli();")
+          replace("common/uart.c",
+                  "\tsei();\n}\n\n#if !defined(MASTER_CONFIG_H)",
+                  "\tSREG = sreg;\n}\n\n#if !defined(MASTER_CONFIG_H)", expected=1)
+
+          # Reject the one genuinely inconsistent build-flag combination without excluding hardware families.
+          replace("src/Makefile",
+                  "endif\nMENU_SHOW_BATTERY?=1",
+                  "endif\nifeq ($(WINDOW_DETECTION_RUNTIME),1)\n ifeq ($(HW_WINDOW_DETECTION),1)\n  $(error ERROR: WINDOW_DETECTION_RUNTIME and HW_WINDOW_DETECTION cannot both be enabled.)\n endif\nendif\nMENU_SHOW_BATTERY?=1", expected=1)
+
+          # Make cppcheck a real gate for firmware code while suppressing its known false positive
+          # about indexing adjacent uint8_t members through the intentionally packed config struct.
+          replace("Makefile",
+                  "\t cppcheck --inline-suppr --force . >/dev/null",
+                  "\t cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex src common >/dev/null")
+
+          # CI: build both physical thermostats we are actively targeting.
+          replace(".github/workflows/reliability-build.yml",
+                  "      - name: Build standalone HR20\n        run: make HR20_original_sww REV=${GITHUB_SHA::8}\n",
+                  "      - name: Build standalone HR20\n        run: make HR20_original_sww REV=${GITHUB_SHA::8}\n\n      - name: Build standalone HR25\n        run: make HR25_original_sww REV=${GITHUB_SHA::8}\n")
+          replace(".github/workflows/reliability-build.yml",
+                  "      - name: Verify EEPROM layout\n        run: bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf",
+                  "      - name: Verify EEPROM layout\n        run: |\n          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf\n          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf")
+          replace(".github/workflows/reliability-build.yml",
+                  "          cat bin/HR20_original_sww/hr20.txt\n          grep -q \"WINDOW_DETECTION_RUNTIME=1\" bin/HR20_original_sww/hr20.txt",
+                  "          cat bin/HR20_original_sww/hr20.txt\n          cat bin/HR25_original_sww/hr20.txt\n          grep -q \"WINDOW_DETECTION_RUNTIME=1\" bin/HR20_original_sww/hr20.txt\n          grep -q \"MOTOR_AUTO_RESYNC=1\" bin/HR20_original_sww/hr20.txt\n          grep -q \"MOTOR_AUTO_RESYNC=1\" bin/HR25_original_sww/hr20.txt")
+          replace(".github/workflows/reliability-build.yml",
+                  "            bin/HR20_original_sww/hr20.txt",
+                  "            bin/HR20_original_sww/hr20.txt\n            bin/HR25_original_sww/hr20.hex\n            bin/HR25_original_sww/hr20.eep\n            bin/HR25_original_sww/hr20.elf\n            bin/HR25_original_sww/hr20.map\n            bin/HR25_original_sww/hr20.txt")
+
+          # Remove the now-obsolete statement that this branch does not migrate EEPROM layouts.
+          replace("RELIABILITY.md",
+                  "This first reliability release intentionally does not migrate the EEPROM format. CI instead verifies the legacy addresses after every standalone build and fails if they move:",
+                  "Runtime window detection now has an explicit migration from legacy layouts `0x14`/`0x15` to `0x16`. Independently of that migration, CI verifies the physical EEPROM symbol addresses and fails if they move:")
+          replace("RELIABILITY.md",
+                  "A future format migration should use one explicitly versioned EEPROM image structure plus a migration path.\n",
+                  "The migration uses staged legacy values and commits the layout byte last so an interrupted upgrade can be resumed safely.\n")
+
+          # Sanity assertions for the fixes themselves.
+          assert "ring_buf_temp_avgs_used < count" in Path("src/controller.c").read_text()
+          assert "return RTC.DD > (31 - 7);" in Path("common/rtc.c").read_text()
+          assert "--error-exitcode=1" in Path("Makefile").read_text()
+          assert "Build standalone HR25" in Path(".github/workflows/reliability-build.yml").read_text()
+          PY
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git diff --check
+          if git diff --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src common Makefile RELIABILITY.md .github/workflows/reliability-build.yml
+          git commit -m "fix: harden thermostat runtime paths"
+          git push origin HEAD:reliability-improvements
