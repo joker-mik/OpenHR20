@@ -1,0 +1,99 @@
+name: Apply AUTO override display
+
+on:
+  push:
+    branches:
+      - reliability-improvements
+    paths:
+      - .github/workflows/apply-auto-override-display.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: reliability-improvements
+          fetch-depth: 0
+
+      - name: Patch AUTO override display
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/menu.c")
+          text = path.read_text()
+
+          old = '''#if HR25
+\t\t// day of week icon
+\t\tLCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);
+#endif
+\t\t// display active temperature type in automatic mode
+\t\tif (CTL_test_auto())
+\t\t{
+\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);
+\t\t}
+\t\tLCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);
+'''
+
+          new = '''#if HR25
+\t\t// day of week icon
+\t\tLCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);
+#endif
+\t\t// A wheel change in AUTO is a temporary override until the next timer event.
+\t\t// Blink AUTO at 0.5 Hz (1 s on / 1 s off) using the existing RTC tick,
+\t\t// rather than the LCD frame blink mode, so the LCD frame interrupt can sleep.
+\t\tif (CTL_mode_auto)
+\t\t{
+\t\t\tif ((CTL_temp_auto_type != TEMP_TYPE_INVALID) && !CTL_test_auto())
+\t\t\t{
+\t\t\t\tLCD_SetSeg(LCD_SEG_AUTO, (RTC_GetSecond() & 1) ? LCD_MODE_OFF : LCD_MODE_ON);
+\t\t\t}
+\t\t\telse
+\t\t\t{
+\t\t\t\tLCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_ON);
+\t\t\t}
+\t\t}
+\t\telse
+\t\t{
+\t\t\tLCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_OFF);
+\t\t}
+
+\t\t// Preset symbols identify the active schedule temperature only while the
+\t\t// current target still matches that schedule. They stay off during override.
+\t\tif (CTL_test_auto())
+\t\t{
+\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);
+\t\t}
+\t\telse
+\t\t{
+\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_OFF);
+\t\t}
+\t\tLCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);
+'''
+
+          if new in text:
+              print("AUTO override display is already patched")
+          elif old not in text:
+              raise SystemExit("Expected menu.c display block not found")
+          else:
+              path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/menu.c
+          git commit -m "feat: blink AUTO during temporary override"
+          git push origin HEAD:reliability-improvements
