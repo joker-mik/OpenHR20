@@ -65,7 +65,7 @@
 
 // our Version
 #define REVHIGH  1                                      //! Revision number high
-#define REVLOW   2                                      //! Revision number low
+#define REVLOW   3                                      //! Revision number low
 #define VERSION_N (0x0000 + REVLOW + (REVHIGH << 8))    //! Version as HEX value F0.92 (E for Experimental)
 
 

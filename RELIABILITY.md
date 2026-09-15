@@ -46,3 +46,7 @@ This first reliability release intentionally does not migrate the EEPROM format.
 - `ee_config`: 0x00c0
 
 A future format migration should use one explicitly versioned EEPROM image structure plus a migration path.
+
+## Runtime-selectable window detection
+
+Standalone Honeywell HR20 builds compile both software and PE2 hardware window detection. EEPROM index `0x26` selects `0=off`, `1=software`, `2=hardware`; software and hardware delays have separate EEPROM entries. Legacy window layouts `0x14` and `0x15` are migrated to the common layout `0x16` before normal configuration loading. The migration stages legacy window values in the reserved EEPROM area and writes the new layout marker last so it can be retried after an interrupted write.

@@ -157,17 +157,13 @@ Gff
 
 liefert die kompilierte EEPROM-Layout-Version.
 
-Fuer den hier dokumentierten Standalone-Build mit Software-Fenstererkennung:
+Fuer den runtime-umschaltbaren Standalone-HR20 gilt:
 
 ```text
-14
+16
 ```
 
-Bei Hardware-Fensterkontakt:
-
-```text
-15
-```
+Beim ersten Start migriert Firmware 1.3 die alten Layouts `0x14` (Software) und `0x15` (Hardware) automatisch auf `0x16`. Die bisherigen Fensterwerte werden dabei soweit moeglich uebernommen.
 
 ---
 
@@ -215,11 +211,14 @@ Gueltig fuer **HR20, RFM=0, Software-Fenstererkennung**.
 | `23` | `bat_warning_thld` | `78` | 2.40 V | 80..160, 0.02 V/LSB | Batterie-Warnschwelle |
 | `24` | `bat_low_thld` | `64` | 2.00 V | 80..160, 0.02 V/LSB | Batterie-Unterspannungsgrenze |
 | `25` | `allow_ADC_during_motor` | `01` | an | 0/1 | ADC auch waehrend Motorlauf |
-| `26` | `window_open_detection_diff` | `32` | 0.50 degC | 7..255, 0.01 degC/LSB | Temperaturabfall fuer Fenster auf |
-| `27` | `window_close_detection_diff` | `32` | 0.50 degC | 7..255, 0.01 degC/LSB | Temperaturanstieg fuer Fenster zu |
-| `28` | `window_open_detection_time` | `08` | 120 s | 1..32, 15 s/LSB | Beobachtungszeit Fenster auf |
-| `29` | `window_close_detection_time` | `08` | 120 s | 1..32, 15 s/LSB | Beobachtungszeit Fenster zu |
-| `2a` | `window_open_timeout` | `5a` | 90 min | 2..255 min | maximale Fenster-offen-Dauer |
+| `26` | `window_detection_mode` | `01` | Software | 0=aus, 1=Software, 2=Hardware PE2 | Auswahl ohne Neu-Flashen |
+| `27` | `window_open_detection_diff` | `32` | 0.50 degC | 7..255, 0.01 degC/LSB | SW: Temperaturabfall fuer Fenster auf |
+| `28` | `window_close_detection_diff` | `32` | 0.50 degC | 7..255, 0.01 degC/LSB | SW: Temperaturanstieg fuer Fenster zu |
+| `29` | `window_open_detection_time` | `08` | 120 s | 1..32, 15 s/LSB | SW: Beobachtungszeit Fenster auf |
+| `2a` | `window_close_detection_time` | `08` | 120 s | 1..32, 15 s/LSB | SW: Beobachtungszeit Fenster zu |
+| `2b` | `window_open_timeout` | `5a` | 90 min | 2..255 min | SW: maximale Fenster-offen-Dauer |
+| `2c` | `hw_window_open_detection_delay` | `05` | 5 s | 0..240 s | HW/PE2: Oeffnungsverzoegerung |
+| `2d` | `hw_window_close_detection_delay` | `05` | 5 s | 0..240 s | HW/PE2: Schliessverzoegerung |
 
 ---
 
@@ -331,74 +330,69 @@ T04
 
 `T04` liefert `CTL_mode_window`. `0000` bedeutet Fensterzustand aus. Ein Wert groesser Null ist der verbleibende interne Fenster-Timer.
 
-### 8.3 Fensterzustand manuell AUS schalten
+### 8.3 Erkennungsart ueber EEPROM waehlen
 
-**Ja.**
+Index `26` waehlt die aktive Erkennungsart zur Laufzeit:
 
-Der dafuer vorgesehene UART-Befehl ist:
+| Wert | Modus |
+| ---: | --- |
+| `00` | Fenstererkennung aus |
+| `01` | Software-Fenstererkennung ueber Temperaturverlauf |
+| `02` | Hardware-Fensterkontakt an PE2 |
 
-```text
-Mfd
-```
-
-`fd` wird intern als spezieller Wert `CTL_CLOSE_WINDOW_FORCE` interpretiert. Die aktuelle Betriebsart AUTO/MANU bleibt dabei unveraendert, aber `CTL_mode_window` wird auf 0 gesetzt.
-
-Auch:
+Beispiele ueber UART:
 
 ```text
-M00
+S2600   Erkennung aus
+S2601   Software
+S2602   Hardware PE2
 ```
 
-und:
+Der gleiche Wert kann im Servicemenue direkt am HR20 geaendert werden. Beim Wechsel des Modus loescht die Firmware einen eventuell noch aktiven Fensterzustand, damit ein SW-Minutenzaehler nicht als HW-Zustand weiterverwendet wird.
+
+### 8.4 Software-Fenster manuell am Geraet schalten
+
+Nur bei `26 = 01`:
 
 ```text
-M01
+PROG + AUTO ca. 3 Sekunden gedrueckt halten
 ```
 
-loeschen den Fensterzustand, wechseln dabei aber zusaetzlich in MANU bzw. AUTO.
+schaltet den Software-Fensterzustand ein bzw. aus. AUTO/MANU bleibt unveraendert. Beim Einschalten wird der Timer aus `2b` geladen. `OPEn`, Frostschutzregelung, automatische Schliesserkennung und Timeout verhalten sich danach wie bei automatisch erkanntem Fenster.
 
-Zum reinen Schliessen daher **`Mfd` verwenden**.
+Bei `26 = 00` oder `26 = 02` wird diese Tastenkombination fuer den Fensterzustand ignoriert. Im Hardwaremodus bleibt PE2 die alleinige Quelle.
 
-### 8.4 Fensterzustand manuell EIN schalten
+Ueber UART beendet `Mfd` weiterhin einen aktiven Fensterzustand, ohne AUTO/MANU zu aendern.
 
-**Nein, in der aktuellen Firmware gibt es dafuer keinen UART-Befehl und keinen normalen Menuepunkt.**
-
-Der Zustand wird momentan nur durch die automatische Software-Fenstererkennung bzw. bei der Hardware-Fenster-Variante durch den Eingang gesetzt.
-
-`Axx` ist **kein Ersatz** fuer Fenster offen: damit wird lediglich eine Solltemperatur gesetzt.
-
-Wenn ein echter manueller Fensterbefehl gewuenscht ist, sollte er explizit implementiert werden, z. B. mit einer neuen Befehlsfamilie:
-
-```text
-O00  Fensterzustand aus
-O01  Fensterzustand manuell ein
-O02  Fensterzustand abfragen
-```
-
-**Diese `O`-Befehle sind derzeit nur ein Vorschlag und noch nicht implementiert.**
-
-### 8.5 Parameter der Software-Fenstererkennung
+### 8.5 Software-Parameter
 
 | Index | Parameter | Default |
 | --- | --- | ---: |
-| `26` | Temperaturabfall zum Oeffnen | 0.50 degC |
-| `27` | Temperaturanstieg zum Schliessen | 0.50 degC |
-| `28` | Beobachtungszeit Oeffnen | 120 s |
-| `29` | Beobachtungszeit Schliessen | 120 s |
-| `2a` | maximaler Fensterzustand | 90 min |
+| `27` | Temperaturabfall zum Oeffnen | 0.50 degC |
+| `28` | Temperaturanstieg zum Schliessen | 0.50 degC |
+| `29` | Beobachtungszeit Oeffnen | 120 s |
+| `2a` | Beobachtungszeit Schliessen | 120 s |
+| `2b` | maximaler Software-Fensterzustand | 90 min |
 
-### 8.6 Hardware-Fensterkontakt
+### 8.6 Hardware-Fensterkontakt PE2
 
-Bei `HW_WINDOW_DETECTION=1` ist die Belegung ab `26` anders:
+Bei `26 = 02` wird PE2 ausgewertet. Der Eingang arbeitet mit Pull-up; die klassische HR20-Hardwarebeschaltung ist Kontakt zwischen PE2 und GND. Die Firmware entprellt/verzoegert Oeffnen und Schliessen getrennt:
 
-| Index | Bedeutung | Default |
+| Index | Parameter | Default |
 | --- | --- | ---: |
-| `26` | `window_open_detection_enable` | 1 |
-| `27` | `window_open_detection_delay` | 5 s |
-| `28` | `window_close_detection_delay` | 5 s |
+| `2c` | Oeffnungsverzoegerung | 5 s |
+| `2d` | Schliessverzoegerung | 5 s |
 
-Diese Build-Variante hat EEPROM-Layout `0x15` statt `0x14`.
+Im Hardwaremodus gibt es keinen 90-Minuten-Timeout: der physische Kontakt ist massgeblich.
 
+### 8.7 Migration von alten EEPROM-Layouts
+
+Firmware 1.3 verwendet gemeinsam `EE_LAYOUT = 0x16`.
+
+- `0x14` wird als alter Software-Build erkannt; die Werte `26..2a` werden nach `27..2b` verschoben und Modus `01` gesetzt.
+- `0x15` wird als alter Hardware-Build erkannt; Enable/Delays werden nach Modus `00/02` und `2c/2d` uebernommen.
+- Die Indizes `00..25` bleiben unveraendert.
+- Fuer einen Stromausfall waehrend der Migration werden die alten Fensterwerte zuerst im reservierten EEPROM-Bereich zwischengespeichert; `ee_layout` wird erst am Ende auf `0x16` gesetzt.
 ---
 
 ## 9. Schaltzeiten im EEPROM

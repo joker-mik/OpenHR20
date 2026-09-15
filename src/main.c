@@ -317,7 +317,16 @@ int __attribute__ ((noreturn)) main(void)
 						// valve protection / CyCL
 						MOTOR_updateCalibration(0);
 					}
-#if (!HW_WINDOW_DETECTION)
+#if WINDOW_DETECTION_RUNTIME
+					if ((config.window_detection_mode == WINDOW_DETECTION_SOFTWARE) && (CTL_mode_window != 0))
+					{
+						CTL_mode_window--;
+						if (CTL_mode_window == 0)
+						{
+							PID_force_update = 0;
+						}
+					}
+#elif (!HW_WINDOW_DETECTION)
 					if (CTL_mode_window != 0)
 					{
 						CTL_mode_window--;
@@ -538,6 +547,9 @@ static inline void init(void)
 
 	//! Initialize the RTC
 	RTC_Init();
+
+	// Upgrade legacy window layouts before config_raw is loaded.
+	eeprom_layout_migrate();
 
 	// press all keys on boot reload default eeprom values
 	eeprom_config_init((PINB & (KBI_PROG | KBI_C | KBI_AUTO)) == 0);
