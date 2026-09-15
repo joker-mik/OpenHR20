@@ -41,6 +41,8 @@
 #include "task.h"
 #include "keyboard.h"
 #include "controller.h"
+#include "eeprom.h"
+#include "menu.h"
 #include "debug.h"
 #include "common/rtc.h"
 
@@ -192,6 +194,22 @@ void task_keyboard_long_press_detect(void)
 			case KBI_AUTO | KBI_C:
 				kb_events |= KB_EVENT_LOCK_LONG;
 				break;
+#if !HW_WINDOW_DETECTION
+			case KBI_PROG | KBI_AUTO:
+				/*
+				 * Manual software-window toggle from the thermostat itself.
+				 * Keep AUTO/MANU unchanged and request an immediate controller update.
+				 * Automatic close detection and window timeout remain active.
+				 */
+				if (!menu_locked)
+				{
+					CTL_mode_window = mode_window() ? 0 : config.window_open_timeout;
+					PID_force_update = 0;
+					/* Return to the home screen so HR20 immediately shows OPEn/off state. */
+					kb_events |= KB_EVENT_NONE_LONG | KB_EVENT_UPDATE_LCD;
+				}
+				break;
+#endif
 			case KBI_PROG | KBI_C | KBI_AUTO:
 				kb_events |= KB_EVENT_ALL_LONG;
 				break;
