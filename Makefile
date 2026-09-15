@@ -106,12 +106,12 @@ HR20_original_sww:
 		RFM=0 \
 		REV=-DREVISION=\\\"$(REV)\\\"
 
+# Compatibility target: standalone HR20 now selects HW/SW from EEPROM.
 HR20_original_hww:
 	 $(shell mkdir $(DEST)/$@ 2>/dev/null)
 	 $(MAKE) -C src \
 		TARGET=../$(DEST)/$@/hr20 \
 		OBJDIR=$@ \
-		# Compatibility target: standalone HR20 now selects HW/SW from EEPROM. \
 		HW_WINDOW_DETECTION=0 \
 		WINDOW_DETECTION_RUNTIME=1 \
 		RFM=0 \
