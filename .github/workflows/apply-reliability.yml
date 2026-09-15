@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: reliability-apply
+  cancel-in-progress: true
+
 jobs:
   apply-and-validate:
     runs-on: ubuntu-22.04
@@ -63,4 +67,6 @@ jobs:
             exit 0
           fi
           git commit -m "feat: improve standalone HR20 reliability"
+          git fetch origin reliability-improvements
+          git rebase origin/reliability-improvements
           git push origin HEAD:reliability-improvements
