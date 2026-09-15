@@ -29,6 +29,9 @@ jobs:
           sed -i 's/^bool MOTOR_CloseReferenceActive/uint8_t MOTOR_CloseReferenceActive/' src/motor.h src/motor.c
           sed -i '/#pragma once/a #include "debug.h"' src/watch.h
 
+      - name: Keep workflow creation outside Actions push
+        run: rm -f .github/workflows/reliability-build.yml
+
       - name: Install pinned AVR toolchain
         run: |
           sudo apt-get update -qq
