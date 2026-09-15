@@ -74,13 +74,14 @@ static uint8_t rx_buff_out = 0;
  ******************************************************************************/
 void COM_putchar(char c)
 {
+	uint8_t sreg = SREG;
 	cli();
 	if ((tx_buff_in + 1) % TX_BUFF_SIZE != tx_buff_out)
 	{
 		tx_buff[tx_buff_in++] = c;
 		tx_buff_in %= TX_BUFF_SIZE;
 	}
-	sei();
+	SREG = sreg;
 }
 
 /*!
@@ -140,6 +141,7 @@ void COM_rx_char_isr(char c)
 static char COM_getchar(void)
 {
 	char c;
+	uint8_t sreg = SREG;
 
 	cli();
 	if (rx_buff_in != rx_buff_out)
@@ -156,7 +158,7 @@ static char COM_getchar(void)
 		COM_requests = 0;
 		c = '\0';
 	}
-	sei();
+	SREG = sreg;
 	return c;
 }
 
@@ -558,9 +560,13 @@ void COM_commad_parse(void)
 			{
 				print_hexXX(EE_LAYOUT);
 			}
-			else
+			else if (com_hex[0] < CONFIG_RAW_SIZE)
 			{
 				print_hexXX(config_raw[com_hex[0]]);
+			}
+			else
+			{
+				print_hexXX(0xff);
 			}
 			break;
 		case 'R':
@@ -727,9 +733,13 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			{
 				wireless_putchar(EE_LAYOUT);
 			}
-			else
+			else if (rfm_framebuf[pos] < CONFIG_RAW_SIZE)
 			{
 				wireless_putchar(config_raw[rfm_framebuf[pos]]);
+			}
+			else
+			{
+				wireless_putchar(0xff);
 			}
 			if (c == 'S')
 			{

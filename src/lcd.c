@@ -678,6 +678,11 @@ void LCD_SetHourBarSeg(uint8_t seg, uint8_t mode)
 {
 	uint8_t segment;
 
+	if (seg >= 24)
+	{
+		return;
+	}
+
 	// Get segment number for this element
 	segment = pgm_read_byte(&LCD_SegHourBarOffsetTablePrgMem[seg]);
 	// Set segment
@@ -734,6 +739,10 @@ void LCD_HourBarBitmap(uint32_t bitmap)
  ******************************************************************************/
 void LCD_SetSeg(uint8_t seg, uint8_t mode)
 {
+	if (seg >= LCD_REGISTER_COUNT * 8)
+	{
+		return;
+	}
 	LCD_SetSegReg(seg / 8, 1 << (seg % 8), mode);
 }
 
@@ -750,6 +759,10 @@ void LCD_SetSeg(uint8_t seg, uint8_t mode)
  ******************************************************************************/
 void LCD_SetSegReg(uint8_t r, uint8_t b, uint8_t mode)
 {
+	if (r >= LCD_REGISTER_COUNT)
+	{
+		return;
+	}
 	// Set bits in each bitplane
 #if LCD_BITPLANES == 2
 	if (mode & 1)

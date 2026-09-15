@@ -123,22 +123,26 @@ static void CTL_window_detection_hardware(void)
 
 static void CTL_window_detection_software(void)
 {
-	uint8_t i = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN
-		     - ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time)
-		    ) % AVGS_BUFFER_LEN;
-	int16_t min = 10000;
-	int16_t max = 0;
+	uint8_t count = ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time);
+	uint8_t i;
+	int16_t min;
+	int16_t max;
 
-	while (1)
+	if ((count == 0) || (count > AVGS_BUFFER_LEN) || (ring_buf_temp_avgs_used < count))
 	{
-		int16_t x = ring_buf_temp_avgs[i];
-		if (x != 0)
-		{
-			if (x < min) min = x;
-			if (x > max) max = x;
-		}
-		if (i == ring_buf_temp_avgs_pos) break;
+		return;
+	}
+
+	i = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN - count) % AVGS_BUFFER_LEN;
+	min = ring_buf_temp_avgs[i];
+	max = min;
+	while (--count)
+	{
+		int16_t x;
 		i = (i + 1) % AVGS_BUFFER_LEN;
+		x = ring_buf_temp_avgs[i];
+		if (x < min) min = x;
+		if (x > max) max = x;
 	}
 	if ((temp_average - min) > (int16_t)config.window_close_detection_diff)
 	{
@@ -216,22 +220,26 @@ static void CTL_window_detection(void)
 #else
 static void CTL_window_detection(void)
 {
-	uint8_t i = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN
-		     - ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time)
-		    ) % AVGS_BUFFER_LEN;
-	int16_t min = 10000;
-	int16_t max = 0;
+	uint8_t count = ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time);
+	uint8_t i;
+	int16_t min;
+	int16_t max;
 
-	while (1)
+	if ((count == 0) || (count > AVGS_BUFFER_LEN) || (ring_buf_temp_avgs_used < count))
 	{
-		int16_t x = ring_buf_temp_avgs[i];
-		if (x != 0)
-		{
-			if (x < min) min = x;
-			if (x > max) max = x;
-		}
-		if (i == ring_buf_temp_avgs_pos) break;
+		return;
+	}
+
+	i = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN - count) % AVGS_BUFFER_LEN;
+	min = ring_buf_temp_avgs[i];
+	max = min;
+	while (--count)
+	{
+		int16_t x;
 		i = (i + 1) % AVGS_BUFFER_LEN;
+		x = ring_buf_temp_avgs[i];
+		if (x < min) min = x;
+		if (x > max) max = x;
 	}
 	if ((temp_average - min) > (int16_t)config.window_close_detection_diff)
 	{
@@ -259,7 +267,12 @@ static void CTL_window_detection(void)
  ******************************************************************************/
 void CTL_update(bool minute_ch)
 {
-#if (HW_WINDOW_DETECTION) && !WINDOW_DETECTION_RUNTIME
+#if WINDOW_DETECTION_RUNTIME
+	if (config.window_detection_mode == WINDOW_DETECTION_HARDWARE)
+	{
+		PORTE |= _BV(PE2); // enable pull-up early so the input can settle before sampling
+	}
+#elif HW_WINDOW_DETECTION
 	PORTE |= _BV(PE2); // enable pull-up
 #endif
 

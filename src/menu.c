@@ -371,7 +371,7 @@ bool menu_controller(void)
 		if (kb_events & KB_EVENT_PROG)     // confirm
 		{
 			temperature_table[menu_state - menu_preset_temp0] = menu_set_temp;
-			eeprom_config_save(menu_state + ((temperature_table - config_raw) - menu_preset_temp0));
+			eeprom_config_save((uint8_t)(OFFSETOF(config_t, temperature0) + (menu_state - menu_preset_temp0)));
 			menu_state++; // menu_preset_temp3+1 == menu_home
 			menu_auto_update_timeout = 0;
 			CTL_update_temp_auto();
@@ -697,11 +697,11 @@ void menu_view(bool clear)
 		LCD_HourBarBitmap(RTC_DowTimerGetHourBar(menu_set_dow));
 		timers_patch_offset = 0xff;
 
-		LCD_SetHourBarSeg(menu_set_time / 60, lcd_blink_mode);
 		LCD_SetSeg(LCD_SEG_COL1, lcd_blink_mode);
 		LCD_SetSeg(LCD_SEG_COL2, lcd_blink_mode);
 		if (menu_set_time < 24 * 60)
 		{
+			LCD_SetHourBarSeg(menu_set_time / 60, lcd_blink_mode);
 			LCD_PrintDec(menu_set_time / 60, 2, lcd_blink_mode);
 			LCD_PrintDec(menu_set_time % 60, 0, lcd_blink_mode);
 		}

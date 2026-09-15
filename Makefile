@@ -62,7 +62,7 @@ beauty:
 	 uncrustify rfm-master/*.h rfm-master/*.c src/*.h src/*.c common/*.h common/*.c -c uncrustify.conf --replace --no-backup
 
 check:
-	 cppcheck --inline-suppr --force . >/dev/null
+	 cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex src common >/dev/null
 
 VER=
 

@@ -182,15 +182,21 @@ RFM_TUNING?=1
 TEMP_COMPENSATE_OPTION?=0
 REMOTE_SETTING_ONLY?=$(RFM)
 HW_WINDOW_DETECTION?=0
-# Standalone Honeywell HR20: compile both window algorithms and select at runtime.
+# Standalone HR20/HR25: compile both window algorithms and select at runtime.
+# Radio builds keep compile-time selection because PE2 can conflict with radio wiring.
 ifeq ($(RFM),0)
- ifeq ($(HW),HONEYWELL)
-  WINDOW_DETECTION_RUNTIME?=1
- else
+ ifeq ($(HW),THERMOTRONIC)
   WINDOW_DETECTION_RUNTIME?=0
+ else
+  WINDOW_DETECTION_RUNTIME?=1
  endif
 else
  WINDOW_DETECTION_RUNTIME?=0
+endif
+ifeq ($(WINDOW_DETECTION_RUNTIME),1)
+ ifeq ($(HW_WINDOW_DETECTION),1)
+  $(error ERROR: WINDOW_DETECTION_RUNTIME and HW_WINDOW_DETECTION cannot both be enabled.)
+ endif
 endif
 MENU_SHOW_BATTERY?=1
 MOTOR_COMPENSATE_BATTERY?=0

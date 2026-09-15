@@ -292,7 +292,7 @@ uint16_t RTC_DowTimerGet(rtc_dow_t dow, uint8_t slot, timermode_t *timermode)
  *  \returns  index of timer
  *
  ******************************************************************************/
-static uint8_t RTC_FindTimerRawIndex(uint8_t dow, uint16_t time_minutes)
+static int8_t RTC_FindTimerRawIndex(uint8_t dow, uint16_t time_minutes)
 {
 	uint8_t search_timers = (dow > 0) ? 8 : 2;
 	int8_t raw_index = -1;
@@ -395,12 +395,13 @@ uint8_t RTC_ActualTimerTemperatureType(bool exact)
 	uint16_t minutes = RTC.hh * 60 + RTC.mm;
 	int8_t dow = ((config.timer_mode == 1) ? RTC.DOW : 0);
 	int8_t raw_index = RTC_FindTimerRawIndex(dow, minutes);
-	uint16_t data = eeprom_timers_read_raw(raw_index);
+	uint16_t data;
 
 	if (raw_index < 0)
 	{
 		return TEMP_TYPE_INVALID;            //not found
 	}
+	data = eeprom_timers_read_raw((uint8_t)raw_index);
 	if (exact)
 	{
 		if ((data & 0xfff) != minutes)
@@ -550,7 +551,7 @@ static bool RTC_IsLastSunday(void)
 	else if (RTC.MM == 10)
 	{
 		// last seven days of month
-		return RTC.DD > (30 - 7);
+		return RTC.DD > (31 - 7);
 	}
 	else
 	{
@@ -618,13 +619,19 @@ static uint8_t RTC_next_compare;
 void RTC_timer_set(uint8_t timer_id, uint8_t time)
 {
 	uint8_t t2, i, next, dif;
+	uint8_t sreg;
 
-	// next is uninitialized, it is correct
+	if ((timer_id == 0) || (timer_id > RTC_TIMERS))
+	{
+		return;
+	}
 
+	sreg = SREG;
 	cli();
 	RTC_timer_todo |= _BV(timer_id);
 	RTC_timer_time[timer_id - 1] = time;
 	t2 = TCNT2;
+	next = t2;
 	dif = 255;
 	for (i = 0; i < RTC_TIMERS; i++)
 	{
@@ -638,12 +645,7 @@ void RTC_timer_set(uint8_t timer_id, uint8_t time)
 		}
 	}
 
-// Ignore maybe ununitialized for next, following above comment
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-
 #if defined(MASTER_CONFIG_H)
-	// cppcheck-suppress uninitvar
 	RTC_next_compare = next;
 #else
 	if (OCR2A != next)
@@ -656,9 +658,7 @@ void RTC_timer_set(uint8_t timer_id, uint8_t time)
 	}
 #endif
 
-#pragma GCC diagnostic pop
-
-	sei();
+	SREG = sreg;
 #if !defined(MASTER_CONFIG_H)
 	TIMSK2 |= (1 << OCIE2A); // enable interupt again
 #endif
@@ -743,32 +743,31 @@ ISR(TIMER2_COMP_vect)
 			}
 		}
 	}
-	uint8_t dif = 255;
-	uint8_t i, next;  // next is uninitialized, it is correct
-	for (i = 0; i < RTC_TIMERS; i++)
-	{
-		if ((RTC_timer_todo & (2 << i)))
-		{
-			if ((RTC_timer_time[i] - t2) <= dif)
-			{
-				next = RTC_timer_time[i];
-				dif = next - t2;
-			}
-		}
-	}
-// Ignore maybe ununitialized for next, following above comment
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-	if (OCR2A != next)
-	{
-		// while (ASSR & (1<<OCR2UB)) {;} // ATmega169 datasheet chapter 17.8.1
-		// waiting is not needed, it not allow timer state machine
-		OCR2A = next;
-	}
-#pragma GCC diagnostic pop
 	if (RTC_timer_todo == 0)
 	{
 		TIMSK2 &= ~(1 << OCIE2A);
+	}
+	else
+	{
+		uint8_t dif = 255;
+		uint8_t i;
+		uint8_t next = t2;
+		for (i = 0; i < RTC_TIMERS; i++)
+		{
+			if ((RTC_timer_todo & (2 << i)))
+			{
+				if ((RTC_timer_time[i] - t2) <= dif)
+				{
+					next = RTC_timer_time[i];
+					dif = next - t2;
+				}
+			}
+		}
+		if (OCR2A != next)
+		{
+			// while (ASSR & (1<<OCR2UB)) {;} // waiting blocks timer state machine
+			OCR2A = next;
+		}
 	}
 }
 #else
@@ -802,25 +801,23 @@ ISR(TIMER1_COMPA_vect)
 				task |= TASK_TIMER; // increment second and check Dow_Timer
 			}
 		}
-		uint8_t dif = 255;
-		uint8_t next;
-		for (i = 0; i < RTC_TIMERS; i++)
+		if (RTC_timer_todo != 0)
 		{
-			if ((RTC_timer_todo & (2 << i)))
+			uint8_t dif = 255;
+			uint8_t next = RTC_s100;
+			for (i = 0; i < RTC_TIMERS; i++)
 			{
-				if ((RTC_timer_time[i] - RTC_s100) < dif)
+				if ((RTC_timer_todo & (2 << i)))
 				{
-					next = RTC_timer_time[i];
-					dif = next - RTC_s100;
+					if ((RTC_timer_time[i] - RTC_s100) < dif)
+					{
+						next = RTC_timer_time[i];
+						dif = next - RTC_s100;
+					}
 				}
 			}
+			RTC_next_compare = next;
 		}
-		// cppcheck-suppress uninitvar
-// Ignore maybe ununitialized for next, following above comment
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-		RTC_next_compare = next;
-#pragma GCC diagnostic pop
 	}
 }
 #endif

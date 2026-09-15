@@ -38,14 +38,14 @@ The normal `D` UART status line additionally prints actual motor percent (`P`) a
 
 OpenHR20 historically stores independent top-level objects in `.eeprom` and relies on their addresses. Compiler/linker changes can silently produce an incompatible EEPROM image.
 
-This first reliability release intentionally does not migrate the EEPROM format. CI instead verifies the legacy addresses after every standalone build and fails if they move:
+Runtime window detection migrates legacy layouts `0x14`/`0x15` to `0x16`. CI independently verifies the physical EEPROM symbol addresses after standalone builds and fails if they move:
 
 - `ee_layout`: 0x0003
 - `ee_timers`: 0x0004
 - `ee_reserved2_60`: 0x0084
 - `ee_config`: 0x00c0
 
-A future format migration should use one explicitly versioned EEPROM image structure plus a migration path.
+Migration stages the legacy window values first and commits the layout byte last; a valid staging header is also used to recover from an interrupted layout-byte write.
 
 ## Runtime-selectable window detection
 

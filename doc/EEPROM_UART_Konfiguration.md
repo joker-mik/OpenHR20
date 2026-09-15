@@ -1,6 +1,6 @@
 # OpenHR20: komplette UART-, EEPROM- und Diagnose-Anleitung
 
-Diese Anleitung gilt primaer fuer den in diesem Fork bevorzugten **Honeywell HR20 ohne RFM (`RFM=0`) mit Software-Fenstererkennung (`HW_WINDOW_DETECTION=0`)**.
+Diese Anleitung gilt primaer fuer die **standalone HR20/HR25 ohne RFM (`RFM=0`)**. Bei beiden werden Software- und PE2-Hardware-Fenstererkennung gemeinsam kompiliert und zur Laufzeit ausgewaehlt.
 
 Sie beschreibt:
 
@@ -157,13 +157,13 @@ Gff
 
 liefert die kompilierte EEPROM-Layout-Version.
 
-Fuer den runtime-umschaltbaren Standalone-HR20 gilt:
+Fuer die runtime-umschaltbaren Standalone-HR20/HR25 gilt:
 
 ```text
 16
 ```
 
-Beim ersten Start migriert Firmware 1.3 die alten Layouts `0x14` (Software) und `0x15` (Hardware) automatisch auf `0x16`. Die bisherigen Fensterwerte werden dabei soweit moeglich uebernommen.
+Beim ersten Start migriert Firmware 1.4 die alten Layouts `0x14` (Software) und `0x15` (Hardware) automatisch auf `0x16`. Die bisherigen Fensterwerte werden dabei soweit moeglich uebernommen. Fuer ein Upgrade mit erhaltenen Einstellungen nur das Flash-HEX programmieren und das bestehende EEPROM nicht mit der neuen `.eep`-Datei ueberschreiben.
 
 ---
 
@@ -219,6 +219,8 @@ Gueltig fuer **HR20, RFM=0, Software-Fenstererkennung**.
 | `2b` | `window_open_timeout` | `5a` | 90 min | 2..255 min | SW: maximale Fenster-offen-Dauer |
 | `2c` | `hw_window_open_detection_delay` | `05` | 5 s | 0..240 s | HW/PE2: Oeffnungsverzoegerung |
 | `2d` | `hw_window_close_detection_delay` | `05` | 5 s | 0..240 s | HW/PE2: Schliessverzoegerung |
+
+**HR25-Hinweis:** Der HR25 besitzt zusaetzlich `bat_half_thld` an Index `23`. Dadurch verschieben sich beim HR25 alle Eintraege ab der HR20-Zeile `23` um **+1**: `bat_warning_thld=24`, `bat_low_thld=25`, `allow_ADC_during_motor=26`, `window_detection_mode=27` und die Fensterparameter laufen bis `2e`. Die Migration verwendet deshalb Struktur-Offsets statt fest codierter Indizes.
 
 ---
 
