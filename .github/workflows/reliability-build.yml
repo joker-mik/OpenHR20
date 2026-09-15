@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  standalone-hr20:
+  standalone-thermostats:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -28,24 +28,38 @@ jobs:
       - name: Build standalone HR20
         run: make HR20_original_sww REV=${GITHUB_SHA::8}
 
+      - name: Build standalone HR25
+        run: make HR25_original_sww REV=${GITHUB_SHA::8}
+
       - name: Static checks
         run: make check
 
       - name: Verify EEPROM layout
-        run: bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+        run: |
+          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf
 
       - name: Show build metadata
         run: |
           cat bin/HR20_original_sww/hr20.txt
+          cat bin/HR25_original_sww/hr20.txt
           grep -q "WINDOW_DETECTION_RUNTIME=1" bin/HR20_original_sww/hr20.txt
+          grep -q "WINDOW_DETECTION_RUNTIME=1" bin/HR25_original_sww/hr20.txt
+          grep -q "MOTOR_AUTO_RESYNC=1" bin/HR20_original_sww/hr20.txt
+          grep -q "MOTOR_AUTO_RESYNC=1" bin/HR25_original_sww/hr20.txt
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: HR20-standalone-${{ github.sha }}
+          name: standalone-thermostats-${{ github.sha }}
           path: |
             bin/HR20_original_sww/hr20.hex
             bin/HR20_original_sww/hr20.eep
             bin/HR20_original_sww/hr20.elf
             bin/HR20_original_sww/hr20.map
             bin/HR20_original_sww/hr20.txt
+            bin/HR25_original_sww/hr20.hex
+            bin/HR25_original_sww/hr20.eep
+            bin/HR25_original_sww/hr20.elf
+            bin/HR25_original_sww/hr20.map
+            bin/HR25_original_sww/hr20.txt
