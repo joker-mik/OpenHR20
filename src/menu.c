@@ -835,10 +835,34 @@ void menu_view(bool clear)
 		// day of week icon
 		LCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);
 #endif
-		// display active temperature type in automatic mode
+		// A wheel change in AUTO is a temporary override until the next timer event.
+		// Blink AUTO at 0.5 Hz (1 s on / 1 s off) using the existing RTC tick,
+		// rather than the LCD frame blink mode, so the LCD frame interrupt can sleep.
+		if (CTL_mode_auto)
+		{
+			if ((CTL_temp_auto_type != TEMP_TYPE_INVALID) && !CTL_test_auto())
+			{
+				LCD_SetSeg(LCD_SEG_AUTO, (RTC_GetSecond() & 1) ? LCD_MODE_OFF : LCD_MODE_ON);
+			}
+			else
+			{
+				LCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_ON);
+			}
+		}
+		else
+		{
+			LCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_OFF);
+		}
+
+		// Preset symbols identify the active schedule temperature only while the
+		// current target still matches that schedule. They stay off during override.
 		if (CTL_test_auto())
 		{
 			show_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);
+		}
+		else
+		{
+			show_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_OFF);
 		}
 		LCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);
 		break;
