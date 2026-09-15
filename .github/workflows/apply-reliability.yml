@@ -1,0 +1,48 @@
+name: Apply reliability changes
+
+on:
+  push:
+    branches:
+      - reliability-improvements
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: reliability-improvements
+          fetch-depth: 0
+
+      - name: Apply reliability changes
+        run: python3 tools/apply_reliability.py
+
+      - name: Install AVR toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-avr binutils-avr avr-libc cppcheck
+          avr-gcc --version
+
+      - name: Build standalone HR20
+        run: make HR20_original_sww REV=reliability
+
+      - name: Static checks
+        run: make check
+
+      - name: Verify EEPROM layout
+        run: bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+
+      - name: Commit validated changes
+        run: |
+          git config user.name "OpenAI Codex"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "feat: improve standalone HR20 reliability"
+          git push origin HEAD:reliability-improvements
