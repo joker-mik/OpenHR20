@@ -29,53 +29,51 @@ jobs:
           path = Path("src/menu.c")
           text = path.read_text()
 
-          old = '''#if HR25
-\t\t// day of week icon
-\t\tLCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);
-#endif
-\t\t// display active temperature type in automatic mode
-\t\tif (CTL_test_auto())
-\t\t{
-\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);
-\t\t}
-\t\tLCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);
-'''
+          old = ("#if HR25\n"
+                 "\t\t// day of week icon\n"
+                 "\t\tLCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);\n"
+                 "#endif\n"
+                 "\t\t// display active temperature type in automatic mode\n"
+                 "\t\tif (CTL_test_auto())\n"
+                 "\t\t{\n"
+                 "\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);\n"
+                 "\t\t}\n"
+                 "\t\tLCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);\n")
 
-          new = '''#if HR25
-\t\t// day of week icon
-\t\tLCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);
-#endif
-\t\t// A wheel change in AUTO is a temporary override until the next timer event.
-\t\t// Blink AUTO at 0.5 Hz (1 s on / 1 s off) using the existing RTC tick,
-\t\t// rather than the LCD frame blink mode, so the LCD frame interrupt can sleep.
-\t\tif (CTL_mode_auto)
-\t\t{
-\t\t\tif ((CTL_temp_auto_type != TEMP_TYPE_INVALID) && !CTL_test_auto())
-\t\t\t{
-\t\t\t\tLCD_SetSeg(LCD_SEG_AUTO, (RTC_GetSecond() & 1) ? LCD_MODE_OFF : LCD_MODE_ON);
-\t\t\t}
-\t\t\telse
-\t\t\t{
-\t\t\t\tLCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_ON);
-\t\t\t}
-\t\t}
-\t\telse
-\t\t{
-\t\t\tLCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_OFF);
-\t\t}
-
-\t\t// Preset symbols identify the active schedule temperature only while the
-\t\t// current target still matches that schedule. They stay off during override.
-\t\tif (CTL_test_auto())
-\t\t{
-\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);
-\t\t}
-\t\telse
-\t\t{
-\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_OFF);
-\t\t}
-\t\tLCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);
-'''
+          new = ("#if HR25\n"
+                 "\t\t// day of week icon\n"
+                 "\t\tLCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);\n"
+                 "#endif\n"
+                 "\t\t// A wheel change in AUTO is a temporary override until the next timer event.\n"
+                 "\t\t// Blink AUTO at 0.5 Hz (1 s on / 1 s off) using the existing RTC tick,\n"
+                 "\t\t// rather than the LCD frame blink mode, so the LCD frame interrupt can sleep.\n"
+                 "\t\tif (CTL_mode_auto)\n"
+                 "\t\t{\n"
+                 "\t\t\tif ((CTL_temp_auto_type != TEMP_TYPE_INVALID) && !CTL_test_auto())\n"
+                 "\t\t\t{\n"
+                 "\t\t\t\tLCD_SetSeg(LCD_SEG_AUTO, (RTC_GetSecond() & 1) ? LCD_MODE_OFF : LCD_MODE_ON);\n"
+                 "\t\t\t}\n"
+                 "\t\t\telse\n"
+                 "\t\t\t{\n"
+                 "\t\t\t\tLCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_ON);\n"
+                 "\t\t\t}\n"
+                 "\t\t}\n"
+                 "\t\telse\n"
+                 "\t\t{\n"
+                 "\t\t\tLCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_OFF);\n"
+                 "\t\t}\n"
+                 "\n"
+                 "\t\t// Preset symbols identify the active schedule temperature only while the\n"
+                 "\t\t// current target still matches that schedule. They stay off during override.\n"
+                 "\t\tif (CTL_test_auto())\n"
+                 "\t\t{\n"
+                 "\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);\n"
+                 "\t\t}\n"
+                 "\t\telse\n"
+                 "\t\t{\n"
+                 "\t\t\tshow_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_OFF);\n"
+                 "\t\t}\n"
+                 "\t\tLCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);\n")
 
           if new in text:
               print("AUTO override display is already patched")
