@@ -17,6 +17,9 @@ jobs:
           ref: reliability-improvements
           fetch-depth: 0
 
+      - name: Configure legacy line endings
+        run: git config core.whitespace cr-at-eol
+
       - name: Apply reliability changes
         run: python3 tools/apply_reliability.py
 
