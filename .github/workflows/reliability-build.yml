@@ -1,0 +1,49 @@
+name: Reliability build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  standalone-hr20:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned AVR toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cppcheck curl bzip2
+          mkdir -p /tmp/avr-toolchain
+          curl -fsSL https://downloads.arduino.cc/tools/avr-gcc-4.9.2-atmel3.5.3-arduino2-x86_64-pc-linux-gnu.tar.bz2 -o /tmp/avr-gcc.tar.bz2
+          tar -xjf /tmp/avr-gcc.tar.bz2 -C /tmp/avr-toolchain
+          AVR_GCC=$(find /tmp/avr-toolchain -type f -name avr-gcc -perm -111 | head -n1)
+          test -n "$AVR_GCC"
+          echo "$(dirname "$AVR_GCC")" >> "$GITHUB_PATH"
+          "$AVR_GCC" --version
+
+      - name: Build standalone HR20
+        run: make HR20_original_sww REV=${GITHUB_SHA::8}
+
+      - name: Static checks
+        run: make check
+
+      - name: Verify EEPROM layout
+        run: bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+
+      - name: Show build metadata
+        run: cat bin/HR20_original_sww/hr20.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: HR20-standalone-${{ github.sha }}
+          path: |
+            bin/HR20_original_sww/hr20.hex
+            bin/HR20_original_sww/hr20.eep
+            bin/HR20_original_sww/hr20.elf
+            bin/HR20_original_sww/hr20.map
+            bin/HR20_original_sww/hr20.txt
