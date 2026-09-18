@@ -449,17 +449,24 @@ void MOTOR_timer_stop(void)
 							CTL_set_error(CTL_ERR_MOTOR);
 						}
 					}
-					else if (MOTOR_ManuCalibration > 0)     // already calibrated, reuse eeprom data
+					else if ((MOTOR_ManuCalibration >= MOTOR_MIN_IMPULSES)
+					         && (MOTOR_ManuCalibration <= MOTOR_MAX_IMPULSES))
 					{
 						MOTOR_PosMax = MOTOR_ManuCalibration;
 						MOTOR_calibration_step = 0;
 						display_task = DISP_TASK_CLEAR | DISP_TASK_UPDATE;
 					}
-					else     // automatic calibration
+					else if (MOTOR_ManuCalibration < 0)     // automatic calibration
 					{
 						MOTOR_Control(close);
 						MOTOR_PosStop = (a - MOTOR_MAX_IMPULSES);
 						MOTOR_calibration_step = 3;
+					}
+					else
+					{
+						// Reject corrupted or implausible stored travel values.
+						MOTOR_calibration_step = -1;
+						CTL_set_error(CTL_ERR_MOTOR);
 					}
 #pragma GCC diagnostic pop
 				}
@@ -475,7 +482,8 @@ void MOTOR_timer_stop(void)
 			{
 				MOTOR_close_reference_active = false;
 				/* Do not turn a jam far from zero into a false reference. */
-				if (MOTOR_PosAct <= MOTOR_MIN_IMPULSES)
+				if ((MOTOR_PosAct >= -MOTOR_MIN_IMPULSES)
+				    && (MOTOR_PosAct <= MOTOR_MIN_IMPULSES))
 				{
 					MOTOR_last_close_reference_delta = MOTOR_PosAct;
 					MOTOR_PosAct = 0;
@@ -504,7 +512,7 @@ void MOTOR_timer_stop(void)
 		}
 	}
 	if ((MOTOR_calibration_step == 0) &&
-	    (MOTOR_PosMax < MOTOR_MIN_IMPULSES))
+	    ((MOTOR_PosMax < MOTOR_MIN_IMPULSES) || (MOTOR_PosMax > MOTOR_MAX_IMPULSES)))
 	{
 		MOTOR_calibration_step = -1; // calibration error
 		CTL_set_error(CTL_ERR_MOTOR);
