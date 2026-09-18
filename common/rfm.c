@@ -54,19 +54,21 @@ uint8_t rfm_available = 0;
 /* Detect an optional RFM12 before enabling its interrupt path. */
 uint8_t RFM_detect(void)
 {
-	uint16_t status1;
-	uint16_t status2;
+	uint8_t present;
 
 	RFM_INT_DIS();
 	RFM_SPI_DESELECT;
 	RFM_SDO_DDR &= ~_BV(RFM_SDO_BITPOS);
 	RFM_SDO_PORT |= _BV(RFM_SDO_BITPOS);
 
-	status1 = RFM_READ_STATUS();
-	status2 = RFM_READ_STATUS();
+	present = (RFM_READ_STATUS() != 0xffff);
+	if (!present)
+	{
+		present = (RFM_READ_STATUS() != 0xffff);
+	}
 
 	RFM_SDO_PORT &= ~_BV(RFM_SDO_BITPOS);
-	return !((status1 == 0xffff) && (status2 == 0xffff));
+	return present;
 }
 #endif
 
