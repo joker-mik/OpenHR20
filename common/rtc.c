@@ -176,6 +176,10 @@ void RTC_SetDay(int8_t day)
 void RTC_SetMonth(int8_t month)
 {
 	RTC.MM = (uint8_t)(month + (-1 + 12)) % 12 + 1;
+	if (RTC.DD > RTC_DaysOfMonth())
+	{
+		RTC.DD = RTC_DaysOfMonth();
+	}
 	RTC_SetDayOfWeek();
 }
 
@@ -187,6 +191,10 @@ void RTC_SetMonth(int8_t month)
 void RTC_SetYear(uint8_t year)
 {
 	RTC.YY = year;
+	if (RTC.DD > RTC_DaysOfMonth())
+	{
+		RTC.DD = RTC_DaysOfMonth();
+	}
 	RTC_SetDayOfWeek();
 }
 
@@ -517,8 +525,16 @@ static void RTC_AddOneDay(void)
 		RTC.DD = 1;
 		if (++RTC.MM > 12)              // Next year
 		{
+			if (RTC.YY == 255)
+			{
+				// rtc_t cannot represent years after 2255; saturate instead of wrapping to 2000.
+				RTC.MM = 12;
+				RTC.DD = 31;
+				return;
+			}
 			RTC.MM = 1;
 			RTC.YY++;
+		}
 		}
 		// Clear Daylight saving Flag
 		RTC_DS = 0;
