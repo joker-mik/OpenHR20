@@ -43,11 +43,12 @@ export RFM_FREQ_FINE=0.35
 # Radio builds remain available through their explicit targets and `make all`.
 default: HR20_original_sww
 
-all: HR20_universal_jd HR20_rfm_int_sww HR20_rfm_int_hww HR20_rfm_ext_sww HR20_original_sww HR20_original_hww HR25_original_sww HR25_rfm_int_sww thermotronic_sww rfm_master
+all: HR20_universal_jd HR25_universal_tk HR20_rfm_int_sww HR20_rfm_int_hww HR20_rfm_ext_sww HR20_original_sww HR20_original_hww HR25_original_sww HR25_rfm_int_sww thermotronic_sww rfm_master
 	 cp src/license.txt $(DEST)/
 
 clean:
 	 $(MAKE) clean -C src TARGET=../$(DEST)/HR20_universal_jd/hr20 OBJDIR=HR20_universal_jd
+	 $(MAKE) clean -C src TARGET=../$(DEST)/HR25_universal_tk/hr20 OBJDIR=HR25_universal_tk
 	 $(MAKE) clean -C src TARGET=../$(DEST)/HR20_rfm_int_sww/hr20 OBJDIR=HR20_rfm_int_sww
 	 $(MAKE) clean -C src TARGET=../$(DEST)/HR20_rfm_int_hww/hr20 OBJDIR=HR20_rfm_int_hww
 	 $(MAKE) clean -C src TARGET=../$(DEST)/HR20_rfm_ext_sww/hr20 OBJDIR=HR20_rfm_ext_sww
@@ -76,6 +77,23 @@ HR20_universal_jd:
 		OBJDIR=$@ \
 		RFM=1 \
 		RFM_WIRE=JD_INTERNAL \
+		RFM_TUNING=1 \
+		RFM_RUNTIME_DETECT=1 \
+		REMOTE_SETTING_ONLY=0 \
+		HW_WINDOW_DETECTION=0 \
+		WINDOW_DETECTION_RUNTIME=1 \
+		GC_SECTIONS=1 \
+		LTO=1 \
+		REV=-DREVISION=\\\"$(REV)\\\"
+
+HR25_universal_tk:
+	 $(shell mkdir $(DEST)/$@ 2>/dev/null)
+	 $(MAKE) -C src \
+		TARGET=../$(DEST)/$@/hr20 \
+		OBJDIR=$@ \
+		HW=HR25 \
+		RFM=1 \
+		RFM_WIRE=TK_INTERNAL \
 		RFM_TUNING=1 \
 		RFM_RUNTIME_DETECT=1 \
 		REMOTE_SETTING_ONLY=0 \
