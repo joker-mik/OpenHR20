@@ -334,7 +334,7 @@ bool menu_controller(void)
 			{
 				if (menu_set_dow != 0)
 				{
-					menu_set_dow = (menu_set_dow == 7) ? 1 : (menu_set_dow + 1);
+					menu_set_dow = menu_set_dow % 7 + 1;
 				}
 				menu_state = menu_set_timer_dow;
 			}
@@ -511,17 +511,7 @@ bool menu_controller(void)
 			if (menu_state == menu_service1)
 			{
 				// change index
-				if (wheel > 0)
-				{
-					if (++service_idx >= CONFIG_RAW_SIZE)
-					{
-						service_idx = 0;
-					}
-				}
-				else if (wheel < 0)
-				{
-					service_idx = (service_idx == 0) ? (CONFIG_RAW_SIZE - 1) : (service_idx - 1);
-				}
+				service_idx = (service_idx + wheel + CONFIG_RAW_SIZE) % CONFIG_RAW_SIZE;
 			}
 			else
 			{
@@ -557,17 +547,9 @@ bool menu_controller(void)
 		}
 		else
 		{
-			if (wheel > 0)
+			service_watch_n = (service_watch_n + wheel + WATCH_N) % WATCH_N;
+			if (wheel != 0)
 			{
-				if (++service_watch_n >= WATCH_N)
-				{
-					service_watch_n = 0;
-				}
-				ret = true;
-			}
-			else if (wheel < 0)
-			{
-				service_watch_n = (service_watch_n == 0) ? (WATCH_N - 1) : (service_watch_n - 1);
 				ret = true;
 			}
 		}
