@@ -1,6 +1,6 @@
 # RFM12B Support
 
-OpenHR20 supports the legacy RFM12/RFM12B sub-GHz transceiver.
+OpenHR20 supports the legacy RFM12/RFM12B sub-GHz transceiver on the thermostats. The separate PC/home-automation gateway is documented in [RFM_MASTER.md](RFM_MASTER.md); historical schematics and photographs are indexed in [HARDWARE.md](HARDWARE.md).
 
 ## Recommended HR20 wiring: JD_INTERNAL
 
