@@ -723,12 +723,8 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			pos++;
 			break;
 		case 'G':
-			if ((uint8_t)(rfm_framepos - pos) < 1)
-			{
-				return;
-			}
 		case 'S':
-			if ((uint8_t)(rfm_framepos - pos) < 2)
+			if ((uint8_t)(rfm_framepos - pos) < ((c == 'S') ? 2 : 1))
 			{
 				return;
 			}
@@ -760,12 +756,8 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			pos++;
 			break;
 		case 'R':
-			if ((uint8_t)(rfm_framepos - pos) < 1)
-			{
-				return;
-			}
 		case 'W':
-			if ((uint8_t)(rfm_framepos - pos) < 3)
+			if ((uint8_t)(rfm_framepos - pos) < ((c == 'W') ? 3 : 1))
 			{
 				return;
 			}
