@@ -29,8 +29,9 @@ The repository default is the plain HR20 standalone firmware.
 | `HR20_rfm_int_sww` | HR20 with JD_INTERNAL RFM; software window detection |
 | `HR20_rfm_int_hww` | HR20 with JD_INTERNAL RFM; hardware window detection |
 | `HR20_rfm_ext_sww` | HR20 with MARIOJTAG RFM; software window detection; JTAG disabled |
+| `HR25_universal_tk` | HR25; optional TK_INTERNAL RFM; local controls; runtime software/PE2 window selection |
 | `HR25_original_sww` | HR25 without RFM |
-| `HR25_rfm_int_sww` | HR25 with TK_INTERNAL RFM |
+| `HR25_rfm_int_sww` | HR25 with fixed TK_INTERNAL RFM |
 | `thermotronic_sww` | Thermotronic without RFM |
 | `rfm_master` | separate RFM master/gateway firmware |
 
@@ -87,3 +88,22 @@ The GitHub Actions reliability build compiles the supported target matrix, runs 
 - SRAM: 1 KiB
 
 A build that links successfully but exceeds those limits is considered a CI failure.
+
+
+## Universal HR25 target
+
+`HR25_universal_tk` enables:
+
+- `HW=HR25`
+- `RFM=1`
+- `RFM_WIRE=TK_INTERNAL`
+- `RFM_TUNING=1`
+- `RFM_RUNTIME_DETECT=1`
+- `REMOTE_SETTING_ONLY=0`
+- `WINDOW_DETECTION_RUNTIME=1`
+- `GC_SECTIONS=1`
+- `LTO=1`
+
+TK_INTERNAL leaves PE2 available for the hardware window contact but uses JTAG pin PF7/TDI, so `DISABLE_JTAG=1` is selected automatically.
+
+The same HR25 HEX can run with or without the TK_INTERNAL RFM module installed. CI enforces the ATmega329PA limits of 32 KiB flash and 2 KiB SRAM.
