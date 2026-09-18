@@ -565,9 +565,13 @@ void COM_commad_parse(void)
 			{
 				print_hexXX(EE_LAYOUT);
 			}
-			else
+			else if (com_hex[0] < CONFIG_RAW_SIZE)
 			{
 				print_hexXX(config_raw[com_hex[0]]);
+			}
+			else
+			{
+				print_hexXX(0xff);
 			}
 			break;
 		case '(':
