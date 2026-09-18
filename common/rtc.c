@@ -88,17 +88,12 @@ static bool    RTC_IsLastSunday(void);          // check actual date if last sun
  */
 static bool RTC_IsLeapYear(void)
 {
-	uint16_t year = 2000U + (uint16_t)RTC.YY;
-
-	if ((year % 4U) != 0U)
-	{
-		return false;
-	}
-	if ((year % 100U) != 0U)
-	{
-		return true;
-	}
-	return (year % 400U) == 0U;
+	/*
+	 * RTC.YY is restricted to 0..255 => calendar years 2000..2255.
+	 * In this range the Gregorian century exceptions are only 2100 and 2200;
+	 * 2000 remains a leap year because it is divisible by 400.
+	 */
+	return ((RTC.YY & 3U) == 0U) && (RTC.YY != 100U) && (RTC.YY != 200U);
 }
 
 // Progmem constants
@@ -611,25 +606,39 @@ static const uint8_t RTC_MonthOffsetTablePrgMem[12] PROGMEM = {
 
 static void RTC_SetDayOfWeek(void)
 {
-	uint16_t year = 2000U + (uint16_t)RTC.YY;
+	uint8_t yy = RTC.YY;
+	uint8_t century_correction;
 	uint16_t tmp_dow;
 
 	/*
-	 * Gregorian weekday calculation. January and February are treated as
-	 * months of the previous year so the /4, /100 and /400 corrections
-	 * apply at the correct boundary, including 2000, 2100 and 2200.
+	 * Gregorian weekday calculation specialized for the representable
+	 * 2000..2255 range. For year 2000+n:
+	 *
+	 *   year + year/4 - year/100 + year/400
+	 *
+	 * is congruent modulo 7 to:
+	 *
+	 *   n + n/4 - n/100
+	 *
+	 * because the constant term for year 2000 is exactly divisible by 7.
+	 * January/February use the previous year, as in the standard formula.
 	 */
 	if (RTC.MM < 3)
 	{
-		year--;
+		if (yy == 0)
+		{
+			/* Previous year is 1999; its Gregorian year term is 5 mod 7. */
+			tmp_dow = 5;
+			goto add_month_day;
+		}
+		yy--;
 	}
 
-	tmp_dow = year
-	          + (year / 4U)
-	          - (year / 100U)
-	          + (year / 400U)
-	          + pgm_read_byte(&RTC_MonthOffsetTablePrgMem[RTC.MM - 1])
-	          + RTC.DD;
+	century_correction = (yy >= 200U) ? 2U : ((yy >= 100U) ? 1U : 0U);
+	tmp_dow = (uint16_t)yy + (yy >> 2) - century_correction;
+
+add_month_day:
+	tmp_dow += pgm_read_byte(&RTC_MonthOffsetTablePrgMem[RTC.MM - 1]) + RTC.DD;
 
 	// Formula returns 0=Sunday, 1=Monday, ... 6=Saturday.
 	RTC.DOW = (uint8_t)(tmp_dow % 7U);
