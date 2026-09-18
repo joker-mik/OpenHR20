@@ -501,6 +501,12 @@
 #include <stdint.h>
 void RFM_init(void);
 uint16_t rfm_spi16(uint16_t outval);
+#if RFM_RUNTIME_DETECT
+extern uint8_t rfm_available;
+uint8_t RFM_detect(void);
+#else
+#define rfm_available 1
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
