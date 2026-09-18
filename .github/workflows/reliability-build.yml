@@ -31,6 +31,17 @@ jobs:
       - name: Build universal HR20 JD_INTERNAL prototype
         run: make HR20_universal_jd REV=${GITHUB_SHA::8}
 
+      - name: Enforce universal HR20 memory limits
+        run: |
+          PROGRAM_BYTES=$(awk '/Program:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
+          DATA_BYTES=$(awk '/Data:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
+          echo "Universal HR20 flash: ${PROGRAM_BYTES}/16384 bytes"
+          echo "Universal HR20 SRAM:  ${DATA_BYTES}/1024 bytes"
+          test -n "$PROGRAM_BYTES"
+          test -n "$DATA_BYTES"
+          test "$PROGRAM_BYTES" -le 16384
+          test "$DATA_BYTES" -le 1024
+
       - name: Build standalone HR25
         run: make HR25_original_sww REV=${GITHUB_SHA::8}
 
