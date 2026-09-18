@@ -308,8 +308,7 @@ int __attribute__ ((noreturn)) main(void)
 				COM_putchar('*');
 				COM_flush();
 #endif
-				uint8_t second = RTC_GetSecond();
-				bool minute = (second == 0);
+				bool minute = (RTC_GetSecond() == 0);
 				CTL_update(minute);
 				if (minute)
 				{
@@ -352,18 +351,18 @@ int __attribute__ ((noreturn)) main(void)
 #if RFM
 				if (rfm_available && (config.RFM_devaddr != 0) && (time_sync_tmo > 1))
 				{
-					if (((second == config.RFM_devaddr) && (wireless_buf_ptr)) ||
+					if (((RTC_GetSecond() == config.RFM_devaddr) && (wireless_buf_ptr)) ||
 					    (
 						    (
-							    (second > 30) &&
+							    (RTC_GetSecond() > 30) &&
 							    (
-								    (second & 1)
+								    (RTC_GetSecond() & 1)
 								    ? (wl_force_addr1 == config.RFM_devaddr)
 								    : (wl_force_addr2 == config.RFM_devaddr)
 							    )
 						    ) || (
 							    (wl_force_addr1 == 0xff) &&
-							    (second % 30 == config.RFM_devaddr) &&
+							    (RTC_GetSecond() % 30 == config.RFM_devaddr) &&
 							    ((wl_force_flags >> config.RFM_devaddr) & 1)
 						    )
 					    )
@@ -372,7 +371,7 @@ int __attribute__ ((noreturn)) main(void)
 						wirelessTimerCase = WL_TIMER_FIRST;
 						RTC_timer_set(RTC_TIMER_RFM, WLTIME_START);
 					}
-					if ((second == 59) || (second == 29))
+					if ((RTC_GetSecond() == 59) || (RTC_GetSecond() == 29))
 					{
 #if (WL_SKIP_SYNC)
 						if (wl_skip_sync != 0)
