@@ -535,7 +535,6 @@ static void RTC_AddOneDay(void)
 			RTC.MM = 1;
 			RTC.YY++;
 		}
-		}
 		// Clear Daylight saving Flag
 		RTC_DS = 0;
 	}
