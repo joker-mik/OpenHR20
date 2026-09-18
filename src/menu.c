@@ -45,6 +45,9 @@
 #include "controller.h"
 #include "menu.h"
 #include "watch.h"
+#if RFM_RUNTIME_DETECT
+#include "common/rfm.h"
+#endif
 
 #if HR25
 #define DISPLAY_HAS_LOCK_ICON 1
@@ -72,7 +75,11 @@ bool menu_locked = false;
 typedef enum
 {
 	// startup
-	menu_startup, menu_version,
+	menu_startup,
+#if RFM_RUNTIME_DETECT
+	menu_rfm_status,
+#endif
+	menu_version,
 #if (!REMOTE_SETTING_ONLY)
 	// preprogramed temperatures
 	menu_preset_temp0, menu_preset_temp1, menu_preset_temp2, menu_preset_temp3,
@@ -211,11 +218,30 @@ bool menu_controller(void)
 	case menu_startup:
 		if (menu_auto_update_timeout == 0)
 		{
+#if RFM_RUNTIME_DETECT
+			if (config.RFM_mode == RFM_MODE_AUTO)
+			{
+				menu_state = menu_rfm_status;
+			}
+			else
+#endif
+			{
+				menu_state = menu_version;
+			}
+			menu_auto_update_timeout = 2;
+			ret = true;
+		}
+		break;
+#if RFM_RUNTIME_DETECT
+	case menu_rfm_status:
+		if (menu_auto_update_timeout == 0)
+		{
 			menu_state = menu_version;
 			menu_auto_update_timeout = 2;
 			ret = true;
 		}
 		break;
+#endif
 	case menu_version:
 		if (menu_auto_update_timeout == 0)
 		{
@@ -649,6 +675,23 @@ void menu_view(bool clear)
 	case menu_startup:
 		LCD_AllSegments(LCD_MODE_ON);           // all segments on
 		break;
+#if RFM_RUNTIME_DETECT
+	case menu_rfm_status:
+		LCD_AllSegments(LCD_MODE_OFF);
+		LCD_PrintChar(LCD_CHAR_r, 3, LCD_MODE_ON);
+		LCD_PrintChar(LCD_CHAR_F, 2, LCD_MODE_ON);
+		if (rfm_available)
+		{
+			LCD_PrintChar(LCD_CHAR_o, 1, LCD_MODE_ON);
+			LCD_PrintChar(LCD_CHAR_n, 0, LCD_MODE_ON);
+		}
+		else
+		{
+			LCD_PrintChar(LCD_CHAR_neg, 1, LCD_MODE_ON);
+			LCD_PrintChar(LCD_CHAR_neg, 0, LCD_MODE_ON);
+		}
+		break;
+#endif
 	case menu_version:
 		clr_show1(LCD_DECIMAL_DOT);
 		LCD_PrintHexW(VERSION_N, LCD_MODE_ON);

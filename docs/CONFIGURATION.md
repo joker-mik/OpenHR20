@@ -91,6 +91,7 @@ The HR20 universal build continues after `22` as follows:
 | `36` | `security_key[7]` | 0x45 | 0 | 255 | RFM security key byte 7 |
 | `37` | `RFM_freqAdjust` | 0 | raw byte | raw byte | signed two's-complement RFM frequency correction |
 | `38` | `RFM_tuning` | 0 | 0 | 1 | 0 narrow/high-rate mode, 1 wide/low-rate tuning mode |
+| `39` | `RFM_mode` | 2 | 0 | 2 | 0 OFF, 1 ON, 2 AUTO; takes effect after reboot |
 
 ## HR25 universal: `HR25_universal_tk`
 
@@ -121,6 +122,22 @@ HR25 has an extra half-battery threshold at index `23`. All later fields are the
 | `37` | `security_key[7]` | 0x45 | 0 | 255 | RFM security key byte 7 |
 | `38` | `RFM_freqAdjust` | 0 | raw byte | raw byte | signed two's-complement RFM frequency correction |
 | `39` | `RFM_tuning` | 0 | 0 | 1 | 0 narrow/high-rate mode, 1 wide/low-rate tuning mode |
+| `3a` | `RFM_mode` | 2 | 0 | 2 | 0 OFF, 1 ON, 2 AUTO; takes effect after reboot |
+
+## RFM runtime mode
+
+Universal RFM builds add `RFM_mode` as the final configuration byte:
+
+- `0 = OFF`: do not probe or initialize the RFM module.
+- `1 = ON`: force the RFM path on without probing. Use this only when a correctly wired module is known to be present.
+- `2 = AUTO`: probe the RFM module during startup and enable radio only when it is detected.
+
+`AUTO` is the default. At startup the display briefly shows:
+
+- `rFon`: an RFM module was detected;
+- `rF--`: no RFM module was detected.
+
+The selected mode is applied during startup, so changing `RFM_mode` in the service menu takes effect after the next reboot.
 
 ## Other build variants
 
@@ -132,7 +149,7 @@ Optional compile-time features such as `BOOST_CONTROLER_AFTER_CHANGE` and `TEMP_
 
 ## EEPROM layout and migration
 
-The runtime-window layout uses EEPROM layout version `0x16`. Legacy window layouts are migrated before `config_raw` is loaded.
+The runtime-window layout without the new runtime-RFM mode uses EEPROM layout version `0x16`. Universal RFM builds use layout `0x17`; migration from `0x16` preserves existing indexes and initializes the appended `RFM_mode` field to AUTO. Legacy window layouts are migrated before `config_raw` is loaded.
 
 The firmware validates values against the min/max table in `src/eeprom.h`.
 
