@@ -1,27 +1,14 @@
-OpenHR20 SW variants:
+OpenHR20 build output directory
 
-original_*   - honeywell HW without modification
-rfm_int_*	 - honeywell with internal RFM12 module 
-rfm_ext_*	 - honeywell with external RFM12 module
-thermotronic_* - thermotronic HW
+This directory is reserved for generated firmware artifacts.
 
+Current build targets, output file meanings and build instructions are documented in:
+  ../docs/BUILD.md
 
-*_sww	- software window detection
-*_hww	- hardware window contact PE2<->GND (closed = connected, open=open)
+Project start page:
+  ../README.md
 
-----------------------------------------------------------------------------
-master1 - SW for RFM12 master board
-http://openhr20.svn.sourceforge.net/viewvc/openhr20/rfmsrc/doc/master_board/
+RFM master/gateway hardware and firmware:
+  ../docs/RFM_MASTER.md
 
-----------------------------------------------------------------------------
-*.bin *.hex 	- flash on BIN and HEX format
-*.eep 			- initial EEPROM content
-*.elf			- flash, eeprom and fuses combination
-*.txt			- info about compilation
-
-----------------------------------------------------------------------------
-Another info:
-
-http://openhr20.sourceforge.net/
-http://openhr20.svn.sourceforge.net/viewvc/openhr20/
-http://embdev.net/topic/118781
+Do not use historical target names or SourceForge/SVN instructions from older copies of this file.
