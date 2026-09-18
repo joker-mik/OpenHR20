@@ -56,7 +56,15 @@ HR25 radio builds use TK_INTERNAL:
 - nSEL: PF0
 - SDO: PE6 / PCINT6
 
-Build:
+Recommended universal build:
+
+```sh
+make HR25_universal_tk
+```
+
+The universal HR25 firmware uses runtime RFM detection, keeps local controls active, retains RFM tuning and supports runtime software/PE2 window detection. Because TK_INTERNAL reuses PF7/TDI, JTAG is disabled for this target.
+
+The fixed radio compatibility build remains available as:
 
 ```sh
 make HR25_rfm_int_sww
