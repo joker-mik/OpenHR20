@@ -330,7 +330,7 @@ ifeq ($(GC_SECTIONS),1)
 CFLAGS += -ffunction-sections
 endif
 ifeq ($(LTO),1)
-CFLAGS += -flto
+CFLAGS += -flto -flto-partition=one
 else
 CFLAGS += -fno-toplevel-reorder
 endif
@@ -416,7 +416,7 @@ ifeq ($(GC_SECTIONS),1)
 LDFLAGS += -Wl,--gc-sections
 endif
 ifeq ($(LTO),1)
-LDFLAGS += -flto
+LDFLAGS += -flto -flto-partition=one
 endif
 #LDFLAGS += -T linker_script.x
 #LDFLAGS += --relax
