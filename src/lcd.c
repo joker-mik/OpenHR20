@@ -529,6 +529,20 @@ void LCD_PrintHexW(uint16_t value, uint8_t mode)
 }
 
 
+static __attribute__((noinline)) void LCD_PrintTempUnit(uint8_t mode)
+{
+#ifdef HR25
+	LCD_PrintChar(LCD_CHAR_NULL, 3, mode);
+	LCD_SetSeg(LCD_DEGREE, mode);
+	LCD_SetSeg(LCD_SEG_CELCIUS, mode);
+	LCD_SetSeg(LCD_SEG_COL5, mode);
+#else
+	LCD_PrintChar(LCD_CHAR_C, 0, mode);
+	LCD_SetSeg(LCD_SEG_COL1, mode);
+#endif
+}
+
+
 /*!
  *******************************************************************************
  *  Print BYTE as temperature on LCD (desired temperature)
@@ -566,15 +580,10 @@ void LCD_PrintTemp(uint8_t temp, uint8_t mode)
 	{
 #ifdef HR25
 #define START_POS 0
-		LCD_PrintChar(LCD_CHAR_NULL, 3, mode);
-		LCD_SetSeg(LCD_DEGREE, mode);           // Display degrees sign
-		LCD_SetSeg(LCD_SEG_CELCIUS, mode);      // Display celsius sign
-		LCD_SetSeg(LCD_SEG_COL5, mode);         // decimal point
 #else
 #define START_POS 1
-		LCD_PrintChar(LCD_CHAR_C, 0, mode);     // Print C on last segment
-		LCD_SetSeg(LCD_SEG_COL1, mode);         // decimal point
 #endif
+		LCD_PrintTempUnit(mode);
 		LCD_PrintDec(temp >> 1, START_POS + 1, mode);
 		LCD_PrintChar(((temp & 1) ? 5 : 0), START_POS, mode);
 		if (temp < (100 / 5))
@@ -617,15 +626,10 @@ void LCD_PrintTempInt(int16_t temp, uint8_t mode)
 
 #ifdef HR25
 #define START_POS 0
-	LCD_PrintChar(LCD_CHAR_NULL, 3, mode);
-	LCD_SetSeg(LCD_DEGREE, mode);           // Display degrees sign
-	LCD_SetSeg(LCD_SEG_CELCIUS, mode);      // Display celsius sign
-	LCD_SetSeg(LCD_SEG_COL5, mode);         // decimal point
 #else
 #define START_POS 1
-	LCD_PrintChar(LCD_CHAR_C, 0, mode);     // Print C on last segment
-	LCD_SetSeg(LCD_SEG_COL1, mode);         // decimal point
 #endif
+	LCD_PrintTempUnit(mode);
 
 	// 1/100°C not printed
 	LCD_PrintDec3(temp / 10, START_POS, mode);
