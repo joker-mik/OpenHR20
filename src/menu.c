@@ -526,10 +526,16 @@ bool menu_controller(void)
 			else
 			{
 				// change value in RAM, to save press PROG
-				int16_t min = (int16_t)config_min(service_idx);
-				int16_t max_min_1 = (int16_t)(config_max(service_idx)) - min + 1;
-				config_raw[service_idx] = (uint8_t)(
-					((int16_t)(config_raw[service_idx]) + (int16_t)wheel - min + max_min_1) % max_min_1 + min);
+				uint8_t min = config_min(service_idx);
+				uint8_t max = config_max(service_idx);
+				if (wheel > 0)
+				{
+					config_raw[service_idx] = (config_raw[service_idx] >= max) ? min : (config_raw[service_idx] + 1);
+				}
+				else if (wheel < 0)
+				{
+					config_raw[service_idx] = (config_raw[service_idx] <= min) ? max : (config_raw[service_idx] - 1);
+				}
 				if (service_idx == 0)
 				{
 					LCD_Init();
