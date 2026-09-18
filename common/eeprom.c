@@ -129,6 +129,7 @@ void EEPROM_write(uint16_t address, uint8_t data)
 #if WINDOW_DETECTION_RUNTIME && !BOOST_CONTROLER_AFTER_CHANGE && !TEMP_COMPENSATE_OPTION
 #define EE_LAYOUT_LEGACY_SOFTWARE 0x14
 #define EE_LAYOUT_LEGACY_HARDWARE 0x15
+#define EE_LAYOUT_RUNTIME_WINDOW 0x16
 #define EE_MIG_MAGIC0 0x57
 #define EE_MIG_MAGIC1 0x4d
 #define EE_MIG_OLD_FIRST ((uint8_t)OFFSETOF(config_t, window_detection_mode))
@@ -171,6 +172,16 @@ void eeprom_layout_migrate(void)
 		}
 		return;
 	}
+
+#if (RFM == 1) && RFM_RUNTIME_DETECT
+	if ((old_layout == EE_LAYOUT_RUNTIME_WINDOW) && (EE_LAYOUT == 0x17))
+	{
+		/* RFM_mode is appended, so existing configuration indexes stay unchanged. */
+		eeprom_config_record_write(EE_CFG_IDX(RFM_mode), RFM_MODE_AUTO, RFM_MODE_AUTO, RFM_MODE_OFF, RFM_MODE_AUTO);
+		EEPROM_write((uint16_t)&ee_layout, EE_LAYOUT);
+		return;
+	}
+#endif
 
 	if (staged)
 	{
@@ -228,6 +239,9 @@ void eeprom_layout_migrate(void)
 		eeprom_config_record_write(EE_CFG_IDX(hw_window_close_detection_delay), old_value[2], 5, 0, 240);
 	}
 
+#if (RFM == 1) && RFM_RUNTIME_DETECT
+	eeprom_config_record_write(EE_CFG_IDX(RFM_mode), RFM_MODE_AUTO, RFM_MODE_AUTO, RFM_MODE_OFF, RFM_MODE_AUTO);
+#endif
 	/* Commit marker last. If power fails earlier, the staged legacy values allow a safe retry. */
 	EEPROM_write((uint16_t)&ee_layout, EE_LAYOUT);
 	EEPROM_write((uint16_t)&ee_reserved2_60[0], 0);
