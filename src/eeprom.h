@@ -51,6 +51,10 @@
 #define WINDOW_DETECTION_SOFTWARE 1
 #define WINDOW_DETECTION_HARDWARE 2
 
+#define RFM_MODE_OFF  0
+#define RFM_MODE_ON   1
+#define RFM_MODE_AUTO 2
+
 typedef struct                                                  // each variables must be uint8_t or int8_t without exception
 {
 	/* 00 */ uint8_t lcd_contrast;
@@ -133,6 +137,9 @@ typedef struct                                                  // each variable
 	/*    */ int8_t RFM_freqAdjust;                         //!< RFM12 Frequency adjustment
 	/*    */ uint8_t RFM_tuning;                            //!< RFM12 tuning mode
 #endif
+#if RFM_RUNTIME_DETECT
+	/*    */ uint8_t RFM_mode;                              //!< 0=off, 1=forced on, 2=auto detect at startup
+#endif
 	/* unused */
 #endif
 } config_t;
@@ -155,7 +162,11 @@ extern uint8_t EEPROM ee_reserved2_60[60];
 #define BOOT_OFF2     (21 * 60 + 0x1000)        //!<  21:00
 
 #if WINDOW_DETECTION_RUNTIME
-#define EE_LAYOUT (0x16)
+ #if (RFM == 1) && RFM_RUNTIME_DETECT
+  #define EE_LAYOUT (0x17)
+ #else
+  #define EE_LAYOUT (0x16)
+ #endif
 #elif (HW_WINDOW_DETECTION)
 #define EE_LAYOUT (0x15)
 #else
@@ -312,6 +323,9 @@ uint8_t EEPROM ee_config[][4] = {       // must be alligned to 4 bytes
 	/*    */ {                     0,                     0,     0x00,                      0xff }, //!< RFM12 Frequency adjustment, 2's complement
 	/*    */ {       RFM_TUNING_MODE,                     0,     0x00,                      0x01 }, //!< RFM12 tuning mode, 0 = tuning mode off (narrow, high data rate),
 	//                                                                                                                      1 = tuning mode on (wide, low data rate)
+ #endif
+ #if RFM_RUNTIME_DETECT
+	/*    */ {         RFM_MODE_AUTO,         RFM_MODE_AUTO, RFM_MODE_OFF,               RFM_MODE_AUTO }, //!< RFM runtime mode: off/on/auto
  #endif
 #endif
 };
