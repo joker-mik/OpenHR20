@@ -87,7 +87,7 @@ void CTL_set_error(uint8_t err_code)
 __attribute__((noinline))    // do not inline in this file
 void CTL_clear_error(uint8_t err_code)
 {
-	int8_t old_err = CTL_error;
+	uint8_t old_err = CTL_error;
 
 	CTL_error &= ~err_code;
 	if (CTL_error != old_err)
