@@ -212,6 +212,27 @@ xtea_enc:
  	pop r2
  	ret
 
+; Rotate an 8-byte CMAC subkey left by one bit.
+; param1: dst pointer in r25:r24
+; param2: src pointer in r23:r22
+; src and dst may be identical.
+.global cmac_left_roll
+cmac_left_roll:
+	movw r26, r24
+	movw r30, r22
+	adiw r30, 7
+	ld r19, Z
+	lsl r19
+	sbiw r30, 7
+	ldi r18, 8
+1:
+	ld r20, Z+
+	rol r20
+	st X+, r20
+	dec r18
+	brne 1b
+	ret
+
 #endif // XTEA_ENC
 
 ;####################################################################
