@@ -21,6 +21,25 @@ The files are historical engineering sources and are intentionally kept in their
 
 For current radio wiring and firmware behavior see [RFM.md](RFM.md). For the separate gateway hardware see [RFM_MASTER.md](RFM_MASTER.md).
 
+## HR25 external connector
+
+The HR25 schematic used by the project shows PE2 on the external 10-pin connector. This makes the firmware hardware-window input accessible without modifying the MCU wiring.
+
+| Connector pin | Signal |
+| --- | --- |
+| 1 | /RESET |
+| 2 | PE2 (hardware window input) |
+| 3 | TMS |
+| 4 | TCK |
+| 5 | TDO |
+| 6 | TDI / PF7 |
+| 7 | RXD |
+| 8 | TXD |
+| 9 | +BAT |
+| 10 | GND |
+
+For `HR25_universal_tk`, TK_INTERNAL uses PF1 (RFM SCK), PF7/TDI (RFM SDI), PF0 (RFM nSEL), and PE6 (RFM SDO). PE2 therefore remains available for the external hardware-window contact. Because PF7/TDI is shared with the radio wiring, JTAG is disabled by firmware after startup for normal RFM operation; keep the JTAGEN fuse enabled if the external JTAG connector is to remain usable for firmware updates.
+
 ## Historical documents
 
 The PDFs, ODT/DOC files, old README files and screenshots under `doc/` document the original project and remain useful as primary engineering material. They are **not** the current build or operating instructions.
