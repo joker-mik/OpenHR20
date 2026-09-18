@@ -28,6 +28,9 @@ jobs:
       - name: Build standalone HR20
         run: make HR20_original_sww REV=${GITHUB_SHA::8}
 
+      - name: Build universal HR20 JD_INTERNAL prototype
+        run: make HR20_universal_jd REV=${GITHUB_SHA::8}
+
       - name: Build standalone HR25
         run: make HR25_original_sww REV=${GITHUB_SHA::8}
 
