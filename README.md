@@ -23,7 +23,7 @@ make HR20_universal_jd
 `HR20_universal_jd` provides:
 
 - normal local operation with wheel and keys;
-- optional JD_INTERNAL RFM12B detected at runtime;
+- optional JD_INTERNAL RFM12B with service-menu OFF / ON / AUTO mode and runtime detection;
 - the same HEX with or without the RFM module fitted;
 - RFM frequency tuning;
 - software window detection;
