@@ -449,9 +449,10 @@ void wirelessReceivePacket(void)
 				else
 #endif
 				{
-					RTC.pkt_cnt += (rfm_framepos + 7 - 2 - 4) / 8;
+					uint8_t pkt_blocks = (rfm_framepos + 1) / 8;
+					RTC.pkt_cnt += pkt_blocks;
 					mac_ok = cmac_calc(rfm_framebuf + 1, rfm_framepos - 1 - 4, (uint8_t *)&RTC, true);
-					RTC.pkt_cnt -= (rfm_framepos + 7 - 2 - 4) / 8;
+					RTC.pkt_cnt -= pkt_blocks;
 					encrypt_decrypt(rfm_framebuf + 2, rfm_framepos - 2 - 4);
 					RTC.pkt_cnt++;
 					COM_dump_packet(rfm_framebuf, rfm_framepos, mac_ok);
