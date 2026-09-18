@@ -60,7 +60,9 @@ Use the README as the project start page; detailed information is split into foc
 
 - **[User guide](docs/USER_GUIDE.md)** — wheel/buttons, long-press combinations, date/time, timers, preset temperatures, key lock, service menu and window handling.
 - **[UART reference](docs/UART.md)** — 9600-baud serial interface, pinout, command syntax and all local commands.
-- **[RFM12B guide](docs/RFM.md)** — JD_INTERNAL, MARIOJTAG, TK_INTERNAL, HR20/HR25 runtime detection, tuning and protocol notes.
+- **[RFM12B guide](docs/RFM.md)** — thermostat-side JD_INTERNAL, MARIOJTAG, TK_INTERNAL, runtime detection, tuning and protocol notes.
+- **[RFM master / gateway](docs/RFM_MASTER.md)** — separate gateway hardware, original master-board schematics and build notes.
+- **[Hardware archive](docs/HARDWARE.md)** — index of the historical schematics, PCB files, photographs and measurements under `doc/`.
 - **[Build guide](docs/BUILD.md)** — toolchain, build matrix, JTAG behaviour, artifacts and CI memory limits.
 - **[Configuration reference](docs/CONFIGURATION.md)** — EEPROM/service-menu parameters, window detection, motor calibration, battery and RFM settings.
 - **[Reliability notes](RELIABILITY.md)** — reliability-oriented changes and design notes.
