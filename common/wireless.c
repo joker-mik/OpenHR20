@@ -79,23 +79,7 @@ static void wirelessSendPacket(void);
 static void wirelessSendPacket(bool cpy);
 #endif
 
-/* Rotate one 64-bit CMAC subkey left by one bit.
- * Carry propagation matches the original AVR assembler exactly.
- * src and dst may point to the same buffer.
- */
-static __attribute__((noinline)) void left_roll(uint8_t *dst, const uint8_t *src)
-{
-	uint8_t i;
-	uint8_t carry = (uint8_t)(src[7] >> 7);
-
-	for (i = 0; i < 8; i++)
-	{
-		uint8_t value = src[i];
-		uint8_t next = (uint8_t)(value >> 7);
-		dst[i] = (uint8_t)((value << 1) | carry);
-		carry = next;
-	}
-}
+extern void cmac_left_roll(uint8_t *dst, const uint8_t *src);
 
 
 
@@ -121,8 +105,8 @@ void crypto_init(void)
 		K1[i] = 0;
 	}
 	xtea_enc(K1, K1, K_mac);
-	left_roll(K1, K1);   /* generate K1 */
-	left_roll(K2, K1);   /* generate K2 */
+	cmac_left_roll(K1, K1);   /* generate K1 */
+	cmac_left_roll(K2, K1);   /* generate K2 */
 #if defined(MASTER_CONFIG_H)
 	LED_RX_off();
 	LED_sync_off();
