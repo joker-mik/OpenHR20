@@ -222,8 +222,8 @@ cmac_left_roll:
 	movw r30, r22
 	adiw r30, 7
 	ld r19, Z
-	lsl r19
 	sbiw r30, 7
+	lsl r19
 	ldi r18, 8
 1:
 	ld r20, Z+
