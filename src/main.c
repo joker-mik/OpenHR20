@@ -581,11 +581,6 @@ static inline void init(void)
 		RFM_init();
 		RFM_OFF();
 	}
-	else
-	{
-		RFM_INT_DIS();
-		RFM_SPI_DESELECT;
-	}
 #endif
 
 	// init keyboard
