@@ -181,6 +181,7 @@ RFM_TUNING?=1
 # Various options
 TEMP_COMPENSATE_OPTION?=0
 REMOTE_SETTING_ONLY?=$(RFM)
+RFM_RUNTIME_DETECT?=0
 HW_WINDOW_DETECTION?=0
 # Standalone HR20/HR25: compile both window algorithms and select at runtime.
 # Radio builds keep compile-time selection because PE2 can conflict with radio wiring.
@@ -261,6 +262,7 @@ CFLAGS = -g$(DEBUG)
 CFLAGS += $(CDEFS)
 CFLAGS += $(REV)
 CFLAGS += -DRFM=$(RFM)
+CFLAGS += -DRFM_RUNTIME_DETECT=$(RFM_RUNTIME_DETECT)
 ifeq ($(RFM),1)
 CFLAGS += -DRFM_BAUD_RATE=$(RFM_BAUD_RATE)
 CFLAGS += -DRFM_DEVICE_ADDRESS=$(RFM_DEVICE_ADDRESS)
