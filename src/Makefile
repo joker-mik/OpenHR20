@@ -326,15 +326,11 @@ CFLAGS += -Wl,--relax
 CFLAGS += -fdata-sections
 GC_SECTIONS?=0
 LTO?=0
-WHOLE_PROGRAM?=0
 ifeq ($(GC_SECTIONS),1)
 CFLAGS += -ffunction-sections
 endif
 ifeq ($(LTO),1)
 CFLAGS += -flto
-ifeq ($(WHOLE_PROGRAM),1)
-CFLAGS += -fwhole-program
-endif
 else
 CFLAGS += -fno-toplevel-reorder
 endif
