@@ -266,13 +266,15 @@ int __attribute__ ((noreturn)) main(void)
 			continue; // on most case we have only 1 task, improve time to sleep
 		}
 
-		// communication
+#ifdef COM_UART
+		// local serial communication
 		if (task & TASK_COM)
 		{
 			task &= ~TASK_COM;
 			COM_commad_parse();
 			continue; // on most case we have only 1 task, improve time to sleep
 		}
+#endif
 
 		// motor stop
 		if (task & TASK_MOTOR_STOP)
