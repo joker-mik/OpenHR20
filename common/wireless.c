@@ -140,7 +140,8 @@ static void encrypt_decrypt(uint8_t *p, uint8_t len)
 }
 static __attribute__((noinline)) void wireless_fifo_reset(void)
 {
-	wireless_fifo_reset();
+	RFM_FIFO_OFF();
+	RFM_FIFO_ON();
 }
 
 
