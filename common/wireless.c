@@ -79,6 +79,25 @@ static void wirelessSendPacket(void);
 static void wirelessSendPacket(bool cpy);
 #endif
 
+/* Rotate one 64-bit CMAC subkey left by one bit.
+ * Carry propagation matches the original AVR assembler exactly.
+ * src and dst may point to the same buffer.
+ */
+static __attribute__((noinline)) void left_roll(uint8_t *dst, const uint8_t *src)
+{
+	uint8_t i;
+	uint8_t carry = (uint8_t)(src[7] >> 7);
+
+	for (i = 0; i < 8; i++)
+	{
+		uint8_t value = src[i];
+		uint8_t next = (uint8_t)(value >> 7);
+		dst[i] = (uint8_t)((value << 1) | carry);
+		carry = next;
+	}
+}
+
+
 
 /*!
  *******************************************************************************
@@ -102,41 +121,13 @@ void crypto_init(void)
 		K1[i] = 0;
 	}
 	xtea_enc(K1, K1, K_mac);
-	asm (
-		"   movw  R30,%A0   \n"
-		"   rcall left_roll \n" /* generate K1 */
-		"   ldi r30,lo8(" STR(K2) ") \n"
-		"   ldi r31,hi8(" STR(K2) ") \n"
-		"   rcall left_roll \n" /* generate K2 */
-		:: "y" (K1)
-		: "r26", "r27", "r30", "r31"
-	);
+	left_roll(K1, K1);   /* generate K1 */
+	left_roll(K2, K1);   /* generate K2 */
 #if defined(MASTER_CONFIG_H)
 	LED_RX_off();
 	LED_sync_off();
 #endif
 }
-/* internal function for crypto_init */
-/* use loop inside - short/slow */
-asm (
-	"left_roll:               \n"
-	"   ldd r26,Y+7           \n"
-	"   lsl r26               \n"
-	"   in r27,__SREG__       \n"   // save carry
-	"   ldi r26,7             \n"   // 8 times
-	"roll_loop:               \n"
-	"   ld __tmp_reg__,Y      \n"
-	"   out __SREG__,r27      \n"   // restore carry
-	"   rol __tmp_reg__       \n"
-	"   in r27,__SREG__       \n"   // save carry
-	"   st Z,__tmp_reg__      \n"
-	"   adiw r28,1            \n"   // Y++
-	"   adiw r30,1            \n"   // Z++
-	"   subi r26,1            \n"
-	"   brcc roll_loop        \n"   // 8 times loop
-	"   sbiw r28,8            \n"   // Y-=8
-	"   ret "
-);
 
 /*!
  *******************************************************************************
