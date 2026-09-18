@@ -70,6 +70,24 @@ The fixed radio compatibility build remains available as:
 make HR25_rfm_int_sww
 ```
 
+
+## Runtime mode: OFF / ON / AUTO
+
+The universal HR20 and HR25 builds expose `RFM_mode` in the service/configuration interface:
+
+- `0 = OFF`: radio hardware remains disabled;
+- `1 = ON`: radio support is forced on without probing;
+- `2 = AUTO`: the module is probed at startup and enabled only when detected.
+
+AUTO is the default and is recommended for universal firmware.
+
+When AUTO is selected, startup briefly reports the result on the LCD:
+
+- `rFon` — module found;
+- `rF--` — no module found.
+
+A changed runtime mode becomes active on the next reboot. `RFM_devaddr=0` remains a separate setting that disables radio network participation; it is not used as the hardware on/off switch.
+
 ## Frequency and tuning
 
 The default main radio band is configured in the top-level Makefile. The firmware also supports EEPROM-based frequency adjustment through `RFM_freqAdjust` and tuning mode through `RFM_tuning`.
