@@ -26,8 +26,8 @@ make HR20_universal_jd
 - optional JD_INTERNAL RFM12B with service-menu OFF / ON / AUTO mode and runtime detection;
 - the same HEX with or without the RFM module fitted;
 - RFM frequency tuning;
-- software window detection;
-- PE2 hardware window-contact detection;
+- software window detection (toggle between off/software/hardware can be set in service menu at runtime);
+- PE2 hardware window-contact detection (toggle between off/software/hardware can be set in service menu at runtime);
 - runtime selection of window-detection mode;
 - JTAG pins left available because JD_INTERNAL does not use them.
 
