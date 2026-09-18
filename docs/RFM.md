@@ -56,11 +56,37 @@ HR25 radio builds use TK_INTERNAL:
 - nSEL: PF0
 - SDO: PE6 / PCINT6
 
-Build:
+Recommended universal build:
+
+```sh
+make HR25_universal_tk
+```
+
+The universal HR25 firmware uses runtime RFM detection, keeps local controls active, retains RFM tuning and supports runtime software/PE2 window detection. Because TK_INTERNAL reuses PF7/TDI, JTAG is disabled for this target.
+
+The fixed radio compatibility build remains available as:
 
 ```sh
 make HR25_rfm_int_sww
 ```
+
+
+## Runtime mode: OFF / ON / AUTO
+
+The universal HR20 and HR25 builds expose `RFM_mode` in the service/configuration interface:
+
+- `0 = OFF`: radio hardware remains disabled;
+- `1 = ON`: radio support is forced on without probing;
+- `2 = AUTO`: the module is probed at startup and enabled only when detected.
+
+AUTO is the default and is recommended for universal firmware.
+
+When AUTO is selected, startup briefly reports the result on the LCD:
+
+- `rFon` — module found;
+- `rF--` — no module found.
+
+A changed runtime mode becomes active on the next reboot. `RFM_devaddr=0` remains a separate setting that disables radio network participation; it is not used as the hardware on/off switch.
 
 ## Frequency and tuning
 
