@@ -159,11 +159,14 @@ int __attribute__ ((noreturn)) main(void)
 	COM_init();
 #endif
 #if RFM
-	// enable persistent RX for initial sync
-	RFM_FIFO_ON();
-	RFM_RX_ON();
-	RFM_INT_EN();         // enable RFM interrupt
-	rfm_mode = rfmmode_rx;
+	if (rfm_available)
+	{
+		// enable persistent RX for initial sync
+		RFM_FIFO_ON();
+		RFM_RX_ON();
+		RFM_INT_EN();         // enable RFM interrupt
+		rfm_mode = rfmmode_rx;
+	}
 #endif
 
 	// Start ADC immediately; motor movement waits for qualified battery data.
@@ -555,7 +558,13 @@ static inline void init(void)
 	eeprom_config_init((PINB & (KBI_PROG | KBI_C | KBI_AUTO)) == 0);
 
 #if RFM
-	crypto_init();
+#if RFM_RUNTIME_DETECT
+	rfm_available = RFM_detect();
+#endif
+	if (rfm_available)
+	{
+		crypto_init();
+	}
 #endif
 
 	//! Initialize the motor
@@ -565,8 +574,16 @@ static inline void init(void)
 	LCD_Init();
 
 #if RFM
-	RFM_init();
-	RFM_OFF();
+	if (rfm_available)
+	{
+		RFM_init();
+		RFM_OFF();
+	}
+	else
+	{
+		RFM_INT_DIS();
+		RFM_SPI_DESELECT;
+	}
 #endif
 
 	// init keyboard
