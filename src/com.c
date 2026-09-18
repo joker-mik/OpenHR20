@@ -303,11 +303,11 @@ static void print_version(bool sync)
  ******************************************************************************/
 void COM_init(void)
 {
-	print_version(false);
 #ifdef COM_UART
+	print_version(false);
 	UART_init();
-#endif
 	COM_flush();
+#endif
 }
 
 
@@ -319,6 +319,7 @@ void COM_init(void)
  ******************************************************************************/
 void COM_print_debug(uint8_t type)
 {
+#ifdef COM_UART
 	print_s_p(PSTR("D: "));
 	print_hexXX(RTC_GetDayOfWeek() + 0xd0);
 	COM_putchar(' ');
@@ -384,6 +385,7 @@ void COM_print_debug(uint8_t type)
 	}
 	COM_putchar('\n');
 	COM_flush();
+#endif
 #if (RFM == 1)
 	bool sync = (type == 2);
 	if (!sync)
@@ -419,6 +421,7 @@ void COM_print_debug(uint8_t type)
 static uint8_t com_hex[3];
 
 
+#ifdef COM_UART
 /*!
  *******************************************************************************
  *  \brief parse hex number (helper function)
@@ -684,6 +687,8 @@ void COM_commad_parse(void)
 #endif
 	}
 }
+
+#endif /* COM_UART */
 
 #if RFM == 1
 static void COM_wireless_word(uint16_t w)
