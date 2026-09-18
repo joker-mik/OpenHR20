@@ -83,7 +83,6 @@ HR20_universal_jd:
 		WINDOW_DETECTION_RUNTIME=1 \
 		GC_SECTIONS=1 \
 		LTO=1 \
-		LTO_SIZE_OPT=1 \
 		REV=-DREVISION=\\\"$(REV)\\\"
 
 HR20_rfm_int_sww:
