@@ -23,7 +23,7 @@ make HR20_universal_jd
 `HR20_universal_jd` provides:
 
 - normal local operation with wheel and keys;
-- optional JD_INTERNAL RFM12B detected at runtime;
+- optional JD_INTERNAL RFM12B with service-menu OFF / ON / AUTO mode and runtime detection;
 - the same HEX with or without the RFM module fitted;
 - RFM frequency tuning;
 - software window detection;
@@ -42,8 +42,9 @@ The universal build is checked in CI against the ATmega169P limits of 16 KiB fla
 | HR20 with JD_INTERNAL RFM, software window detection | `HR20_rfm_int_sww` |
 | HR20 with JD_INTERNAL RFM, hardware PE2 window detection | `HR20_rfm_int_hww` |
 | HR20 with MARIOJTAG RFM | `HR20_rfm_ext_sww` |
+| HR25, recommended universal TK_INTERNAL setup | `HR25_universal_tk` |
 | HR25 without RFM | `HR25_original_sww` |
-| HR25 with TK_INTERNAL RFM | `HR25_rfm_int_sww` |
+| HR25 with fixed TK_INTERNAL RFM | `HR25_rfm_int_sww` |
 | Thermotronic | `thermotronic_sww` |
 | RFM master/gateway | `rfm_master` |
 
@@ -59,7 +60,7 @@ Use the README as the project start page; detailed information is split into foc
 
 - **[User guide](docs/USER_GUIDE.md)** — wheel/buttons, long-press combinations, date/time, timers, preset temperatures, key lock, service menu and window handling.
 - **[UART reference](docs/UART.md)** — 9600-baud serial interface, pinout, command syntax and all local commands.
-- **[RFM12B guide](docs/RFM.md)** — JD_INTERNAL, MARIOJTAG, TK_INTERNAL, runtime detection, tuning and protocol notes.
+- **[RFM12B guide](docs/RFM.md)** — JD_INTERNAL, MARIOJTAG, TK_INTERNAL, HR20/HR25 runtime detection, tuning and protocol notes.
 - **[Build guide](docs/BUILD.md)** — toolchain, build matrix, JTAG behaviour, artifacts and CI memory limits.
 - **[Configuration reference](docs/CONFIGURATION.md)** — EEPROM/service-menu parameters, window detection, motor calibration, battery and RFM settings.
 - **[Reliability notes](RELIABILITY.md)** — reliability-oriented changes and design notes.
