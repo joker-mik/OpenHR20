@@ -278,12 +278,16 @@ static void print_s_p(const char *s)
 static void print_version(bool sync)
 {
 	const char *s = (PSTR(VERSION_STRING "\n"));
-
-	COM_putchar('V');
 	char c;
+
+#ifdef COM_UART
+	COM_putchar('V');
+#endif
 	for (c = pgm_read_byte(s); c; ++s, c = pgm_read_byte(s))
 	{
+#ifdef COM_UART
 		COM_putchar(c);
+#endif
 #if RFM == 1
 		if (sync)
 		{
