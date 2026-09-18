@@ -371,7 +371,7 @@ bool menu_controller(void)
 		if (kb_events & KB_EVENT_PROG)     // confirm
 		{
 			temperature_table[menu_state - menu_preset_temp0] = menu_set_temp;
-			eeprom_config_save(menu_state + ((temperature_table - config_raw) - menu_preset_temp0));
+			eeprom_config_save((uint8_t)(OFFSETOF(config_t, temperature0) + (menu_state - menu_preset_temp0)));
 			menu_state++; // menu_preset_temp3+1 == menu_home
 			menu_auto_update_timeout = 0;
 			CTL_update_temp_auto();
@@ -516,10 +516,16 @@ bool menu_controller(void)
 			else
 			{
 				// change value in RAM, to save press PROG
-				int16_t min = (int16_t)config_min(service_idx);
-				int16_t max_min_1 = (int16_t)(config_max(service_idx)) - min + 1;
-				config_raw[service_idx] = (uint8_t)(
-					((int16_t)(config_raw[service_idx]) + (int16_t)wheel - min + max_min_1) % max_min_1 + min);
+				uint8_t min = config_min(service_idx);
+				uint8_t max = config_max(service_idx);
+				if (wheel > 0)
+				{
+					config_raw[service_idx] = (config_raw[service_idx] >= max) ? min : (config_raw[service_idx] + 1);
+				}
+				else if (wheel < 0)
+				{
+					config_raw[service_idx] = (config_raw[service_idx] <= min) ? max : (config_raw[service_idx] - 1);
+				}
 				if (service_idx == 0)
 				{
 					LCD_Init();
@@ -697,11 +703,11 @@ void menu_view(bool clear)
 		LCD_HourBarBitmap(RTC_DowTimerGetHourBar(menu_set_dow));
 		timers_patch_offset = 0xff;
 
-		LCD_SetHourBarSeg(menu_set_time / 60, lcd_blink_mode);
 		LCD_SetSeg(LCD_SEG_COL1, lcd_blink_mode);
 		LCD_SetSeg(LCD_SEG_COL2, lcd_blink_mode);
 		if (menu_set_time < 24 * 60)
 		{
+			LCD_SetHourBarSeg(menu_set_time / 60, lcd_blink_mode);
 			LCD_PrintDec(menu_set_time / 60, 2, lcd_blink_mode);
 			LCD_PrintDec(menu_set_time % 60, 0, lcd_blink_mode);
 		}
@@ -814,6 +820,8 @@ void menu_view(bool clear)
 		}
 	// do not use break at this position / optimization
 	case menu_home_no_alter: // wanted temp
+	{
+		bool auto_matches = CTL_test_auto();
 		if (clear)
 		{
 			if (CTL_mode_auto)
@@ -835,12 +843,37 @@ void menu_view(bool clear)
 		// day of week icon
 		LCD_SetSeg(LCD_SEG_D1 + RTC_GetDayOfWeek() - 1, LCD_MODE_ON);
 #endif
-		// display active temperature type in automatic mode
-		if (CTL_test_auto())
+		// A wheel change in AUTO is a temporary override until the next timer event.
+		// Blink AUTO at 0.5 Hz (1 s on / 1 s off) using the existing RTC tick,
+		// rather than the LCD frame blink mode, so the LCD frame interrupt can sleep.
+		if (CTL_mode_auto)
+		{
+			if ((CTL_temp_auto_type != TEMP_TYPE_INVALID) && !auto_matches)
+			{
+				LCD_SetSeg(LCD_SEG_AUTO, (RTC_GetSecond() & 1) ? LCD_MODE_OFF : LCD_MODE_ON);
+			}
+			else
+			{
+				LCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_ON);
+			}
+		}
+		else
+		{
+			LCD_SetSeg(LCD_SEG_AUTO, LCD_MODE_OFF);
+		}
+
+		// Preset symbols identify the active schedule temperature only while the
+		// current target still matches that schedule. They stay off during override.
+		if (auto_matches)
 		{
 			show_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);
 		}
+		else
+		{
+			show_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_OFF);
+		}
 		LCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);
+	}
 		break;
 	case menu_home2: // real temperature
 		if (clear)
@@ -860,7 +893,7 @@ void menu_view(bool clear)
 			uint8_t prc = MOTOR_GetPosPercent();
 			if (prc <= 100)
 			{
-				LCD_PrintDec3(MOTOR_GetPosPercent(), 0, LCD_MODE_ON);
+				LCD_PrintDec3(prc, 0, LCD_MODE_ON);
 #if HR25
 				// percent sign
 				LCD_SetSeg(LCD_SEG_PERCENT, LCD_MODE_ON);

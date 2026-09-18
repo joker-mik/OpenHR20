@@ -75,6 +75,7 @@
 
 bool task_ADC(void);
 void start_task_ADC(void);
+bool ADC_BatteryReady(void);
 
 
 extern bool sleep_with_ADC;
@@ -82,3 +83,4 @@ extern int16_t ring_average[];
 extern int16_t ring_difference[];
 extern int16_t ring_buf_temp_avgs [AVGS_BUFFER_LEN];
 extern uint8_t ring_buf_temp_avgs_pos;
+extern uint8_t ring_buf_temp_avgs_used;

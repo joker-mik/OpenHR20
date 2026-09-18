@@ -48,6 +48,7 @@
 #include "eeprom.h"
 #include "controller.h"
 #include "menu.h"
+#include "motor.h"
 #include "common/wireless.h"
 #include "debug.h"
 
@@ -73,13 +74,14 @@ static uint8_t rx_buff_out = 0;
  ******************************************************************************/
 void COM_putchar(char c)
 {
+	uint8_t sreg = SREG;
 	cli();
 	if ((tx_buff_in + 1) % TX_BUFF_SIZE != tx_buff_out)
 	{
 		tx_buff[tx_buff_in++] = c;
 		tx_buff_in %= TX_BUFF_SIZE;
 	}
-	sei();
+	SREG = sreg;
 }
 
 /*!
@@ -139,6 +141,7 @@ void COM_rx_char_isr(char c)
 static char COM_getchar(void)
 {
 	char c;
+	uint8_t sreg = SREG;
 
 	cli();
 	if (rx_buff_in != rx_buff_out)
@@ -155,7 +158,7 @@ static char COM_getchar(void)
 		COM_requests = 0;
 		c = '\0';
 	}
-	sei();
+	SREG = sreg;
 	return c;
 }
 
@@ -275,12 +278,16 @@ static void print_s_p(const char *s)
 static void print_version(bool sync)
 {
 	const char *s = (PSTR(VERSION_STRING "\n"));
-
-	COM_putchar('V');
 	char c;
+
+#ifdef COM_UART
+	COM_putchar('V');
+#endif
 	for (c = pgm_read_byte(s); c; ++s, c = pgm_read_byte(s))
 	{
+#ifdef COM_UART
 		COM_putchar(c);
+#endif
 #if RFM == 1
 		if (sync)
 		{
@@ -298,13 +305,17 @@ static void print_version(bool sync)
  *
  *  \note
  ******************************************************************************/
+#if RFM == 1
+static void COM_wireless_word(uint16_t w);
+#endif
+
 void COM_init(void)
 {
-	print_version(false);
 #ifdef COM_UART
+	print_version(false);
 	UART_init();
-#endif
 	COM_flush();
+#endif
 }
 
 
@@ -316,6 +327,7 @@ void COM_init(void)
  ******************************************************************************/
 void COM_print_debug(uint8_t type)
 {
+#ifdef COM_UART
 	print_s_p(PSTR("D: "));
 	print_hexXX(RTC_GetDayOfWeek() + 0xd0);
 	COM_putchar(' ');
@@ -334,6 +346,10 @@ void COM_print_debug(uint8_t type)
 	COM_putchar((CTL_mode_auto) ? (CTL_test_auto() ? 'A' : '-') : 'M');
 	print_s_p(PSTR(" V: "));
 	print_decXX(valve_wanted);
+	print_s_p(PSTR(" P: "));
+	print_decXX(MOTOR_GetPosPercent());
+	print_s_p(PSTR(" R: "));
+	print_decXX(MOTOR_close_reference_count);
 	print_s_p(PSTR(" I: "));
 	print_decXXXX(temp_average);
 	print_s_p(PSTR(" S: "));
@@ -377,6 +393,7 @@ void COM_print_debug(uint8_t type)
 	}
 	COM_putchar('\n');
 	COM_flush();
+#endif
 #if (RFM == 1)
 	bool sync = (type == 2);
 	if (!sync)
@@ -394,10 +411,8 @@ void COM_print_debug(uint8_t type)
 		| ((mode_window()) ? 0x40 : 0)
 		| ((menu_locked) ? 0x80 : 0));
 	wireless_putchar(CTL_error);
-	wireless_putchar(temp_average >> 8);    // current temp
-	wireless_putchar(temp_average & 0xff);
-	wireless_putchar(bat_average >> 8);     // current temp
-	wireless_putchar(bat_average & 0xff);
+	COM_wireless_word((uint16_t)temp_average);
+	COM_wireless_word(bat_average);
 	wireless_putchar(CTL_temp_wanted);      // wanted temp
 	wireless_putchar(valve_wanted);         // valve pos
 	wireless_async = false;
@@ -412,6 +427,7 @@ void COM_print_debug(uint8_t type)
 static uint8_t com_hex[3];
 
 
+#ifdef COM_UART
 /*!
  *******************************************************************************
  *  \brief parse hex number (helper function)
@@ -553,9 +569,13 @@ void COM_commad_parse(void)
 			{
 				print_hexXX(EE_LAYOUT);
 			}
-			else
+			else if (com_hex[0] < CONFIG_RAW_SIZE)
 			{
 				print_hexXX(config_raw[com_hex[0]]);
+			}
+			else
+			{
+				print_hexXX(0xff);
 			}
 			break;
 		case 'R':
@@ -674,6 +694,8 @@ void COM_commad_parse(void)
 	}
 }
 
+#endif /* COM_UART */
+
 #if RFM == 1
 static void COM_wireless_word(uint16_t w)
 {
@@ -703,12 +725,20 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			COM_print_debug(2);
 			break;
 		case 'T':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			wireless_putchar(rfm_framebuf[pos]);
 			COM_wireless_word(watch(rfm_framebuf[pos]));
 			pos++;
 			break;
 		case 'G':
 		case 'S':
+			if ((uint8_t)(rfm_framepos - pos) < ((c == 'S') ? 2 : 1))
+			{
+				return;
+			}
 			if (c == 'S')
 			{
 				if (rfm_framebuf[pos] < CONFIG_RAW_SIZE)
@@ -722,9 +752,13 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			{
 				wireless_putchar(EE_LAYOUT);
 			}
-			else
+			else if (rfm_framebuf[pos] < CONFIG_RAW_SIZE)
 			{
 				wireless_putchar(config_raw[rfm_framebuf[pos]]);
+			}
+			else
+			{
+				wireless_putchar(0xff);
 			}
 			if (c == 'S')
 			{
@@ -734,6 +768,10 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			break;
 		case 'R':
 		case 'W':
+			if ((uint8_t)(rfm_framepos - pos) < ((c == 'W') ? 3 : 1))
+			{
+				return;
+			}
 			if (c == 'W')
 			{
 				RTC_DowTimerSet(
@@ -753,6 +791,10 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			pos++;
 			break;
 		case 'B':
+			if ((uint8_t)(rfm_framepos - pos) < 2)
+			{
+				return;
+			}
 			if ((rfm_framebuf[pos] == 0x13) && (rfm_framebuf[pos + 1] == 0x24))
 			{
 				reboot = true;
@@ -762,10 +804,18 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			pos += 2;
 			break;
 		case 'M':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			CTL_change_mode(rfm_framebuf[pos++]);
 			COM_print_debug(2);
 			break;
 		case 'A':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			if (rfm_framebuf[pos] < TEMP_MIN - 1)
 			{
 				break;
@@ -778,6 +828,10 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			COM_print_debug(2);
 			break;
 		case 'L':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			if (rfm_framebuf[pos] <= 1)
 			{
 				menu_locked = rfm_framebuf[pos];

@@ -46,13 +46,10 @@
 #define B16 0x8000
 #define B_MASK 0x8000
 
-int16_t MOTOR_PosMax;
-
-
 #if DEBUG_MOTOR_COUNTER
-#define WATCH_LAYOUT 0x85
+#define WATCH_LAYOUT 0x86
 #else
-#define WATCH_LAYOUT 0x05
+#define WATCH_LAYOUT 0x06
 #endif
 
 
@@ -66,9 +63,11 @@ static const uint16_t watch_map[WATCH_N] PROGMEM = {
 	/* 06 */ ((uint16_t)&MOTOR_PosMax) + B16,
 	/* 07 */ ((uint16_t)&MOTOR_PosAct) + B16,
 	/* 08 */ ((uint16_t)&MOTOR_PosOvershoot) + B8,
+	/* 09 */ ((uint16_t)&MOTOR_close_reference_count) + B8,
+	/* 0a */ ((uint16_t)&MOTOR_last_close_reference_delta) + B16,
 #if DEBUG_MOTOR_COUNTER
-	/* 09 */ ((uint16_t)&MOTOR_counter) + B16,
-	/* 0a */ ((uint16_t)&MOTOR_counter) + 2 + B16,
+	/* 0b */ ((uint16_t)&MOTOR_counter) + B16,
+	/* 0c */ ((uint16_t)&MOTOR_counter) + 2 + B16,
 #endif
 };
 

@@ -51,7 +51,10 @@ uint8_t CTL_temp_wanted_last = 0xff;            // desired temperature value use
 uint8_t CTL_temp_auto_type = TEMP_TYPE_INVALID; // actual desired temperature type by timer
 bool CTL_mode_auto = true;                      // actual desired temperature by timer
 uint8_t CTL_mode_window = 0;                    // open window (0=closed, >0 open-timer)
-#if (HW_WINDOW_DETECTION)
+#if WINDOW_DETECTION_RUNTIME
+static uint8_t window_timer = AVERAGE_LEN + 1;
+static uint8_t window_detection_mode_last = 0xff;
+#elif (HW_WINDOW_DETECTION)
 static uint8_t window_timer = AVERAGE_LEN + 1;
 #else
 uint16_t CTL_open_window_timeout;
@@ -70,9 +73,9 @@ static uint8_t pid_Controller(int16_t setPoint, int16_t processValue, uint8_t ol
 uint8_t CTL_error = 0;
 
 __attribute__((noinline))    // do not inline in this file
-void CTL_set_error(int8_t err_code)
+void CTL_set_error(uint8_t err_code)
 {
-	int8_t old_err = CTL_error;
+	uint8_t old_err = CTL_error;
 
 	CTL_error |= err_code;
 	if (CTL_error != old_err)
@@ -82,9 +85,9 @@ void CTL_set_error(int8_t err_code)
 }
 
 __attribute__((noinline))    // do not inline in this file
-void CTL_clear_error(int8_t err_code)
+void CTL_clear_error(uint8_t err_code)
 {
-	int8_t old_err = CTL_error;
+	uint8_t old_err = CTL_error;
 
 	CTL_error &= ~err_code;
 	if (CTL_error != old_err)
@@ -93,18 +96,14 @@ void CTL_clear_error(int8_t err_code)
 	}
 }
 
-#if (HW_WINDOW_DETECTION)
-static void CTL_window_detection(void)
+#if WINDOW_DETECTION_RUNTIME
+static void CTL_window_detection_hardware(void)
 {
-	bool w;
+	bool w = ((PINE & _BV(PE2)) != 0);
 
-	// PORTE |= _BV(PE2); // enable pull-up
-	// nop();nop();
-	w = ((PINE & _BV(PE2)) != 0) && config.window_open_detection_enable;
 	if (!w)
 	{
-		PORTE &= ~_BV(PE2); // disable pullup for save energy
-
+		PORTE &= ~_BV(PE2); // disable pull-up between samples when contact is closed
 	}
 	if (CTL_mode_window != w)
 	{
@@ -112,7 +111,6 @@ static void CTL_window_detection(void)
 		{
 			CTL_mode_window = w;
 			PID_force_update = 0;
-			// kb_events |= KB_EVENT_UPDATE_LCD;
 		}
 		else
 		{
@@ -120,36 +118,31 @@ static void CTL_window_detection(void)
 			return;
 		}
 	}
-	window_timer = (w) ? (config.window_close_detection_delay) : (config.window_open_detection_delay);
+	window_timer = w ? config.hw_window_close_detection_delay : config.hw_window_open_detection_delay;
 }
-#else
-static void CTL_window_detection(void)
-{
-	uint8_t i = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN
-		     - ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time)
-		    ) % AVGS_BUFFER_LEN;
-	int16_t min = 10000;
-	int16_t max = 0;
 
-	while (1)
+static void CTL_window_detection_software(void)
+{
+	uint8_t count = ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time);
+	uint8_t i;
+	int16_t min;
+	int16_t max;
+
+	if ((count == 0) || (count > AVGS_BUFFER_LEN) || (ring_buf_temp_avgs_used < count))
 	{
-		int16_t x = ring_buf_temp_avgs[i];
-		if (x != 0)   // startup condition
-		{
-			if (x < min)
-			{
-				min = x;
-			}
-			if (x > max)
-			{
-				max = x;
-			}
-		}
-		if (i == ring_buf_temp_avgs_pos)
-		{
-			break;
-		}
+		return;
+	}
+
+	i = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN - count) % AVGS_BUFFER_LEN;
+	min = ring_buf_temp_avgs[i];
+	max = min;
+	while (--count)
+	{
+		int16_t x;
 		i = (i + 1) % AVGS_BUFFER_LEN;
+		x = ring_buf_temp_avgs[i];
+		if (x < min) min = x;
+		if (x > max) max = x;
 	}
 	if ((temp_average - min) > (int16_t)config.window_close_detection_diff)
 	{
@@ -157,17 +150,109 @@ static void CTL_window_detection(void)
 		{
 			CTL_mode_window = 0;
 			PID_force_update = 0;
-			//kb_events |= KB_EVENT_UPDATE_LCD;
 		}
 	}
-	else
+	else if ((CTL_mode_window == 0) && ((max - temp_average) > (int16_t)config.window_open_detection_diff))
 	{
-		if ((CTL_mode_window == 0) && ((max - temp_average) > (int16_t)config.window_open_detection_diff))
+		CTL_mode_window = config.window_open_timeout;
+		PID_force_update = 0;
+	}
+}
+
+static void CTL_window_detection(void)
+{
+	uint8_t mode = config.window_detection_mode;
+
+	if (mode != window_detection_mode_last)
+	{
+		CTL_mode_window = 0;
+		PID_force_update = 0;
+		window_timer = config.hw_window_open_detection_delay;
+		window_detection_mode_last = mode;
+	}
+
+	switch (mode)
+	{
+	case WINDOW_DETECTION_SOFTWARE:
+		PORTE &= ~_BV(PE2);
+		CTL_window_detection_software();
+		break;
+	case WINDOW_DETECTION_HARDWARE:
+		PORTE |= _BV(PE2);
+		nop(); nop();
+		CTL_window_detection_hardware();
+		break;
+	default:
+		PORTE &= ~_BV(PE2);
+		if (CTL_mode_window != 0)
 		{
-			CTL_mode_window = config.window_open_timeout;
+			CTL_mode_window = 0;
 			PID_force_update = 0;
-			//kb_events |= KB_EVENT_UPDATE_LCD;
 		}
+		break;
+	}
+}
+#elif (HW_WINDOW_DETECTION)
+static void CTL_window_detection(void)
+{
+	bool w;
+
+	w = ((PINE & _BV(PE2)) != 0) && config.window_open_detection_enable;
+	if (!w)
+	{
+		PORTE &= ~_BV(PE2);
+	}
+	if (CTL_mode_window != w)
+	{
+		if (window_timer == 0)
+		{
+			CTL_mode_window = w;
+			PID_force_update = 0;
+		}
+		else
+		{
+			window_timer--;
+			return;
+		}
+	}
+	window_timer = (w) ? config.window_close_detection_delay : config.window_open_detection_delay;
+}
+#else
+static void CTL_window_detection(void)
+{
+	uint8_t count = ((CTL_mode_window != 0) ? config.window_close_detection_time : config.window_open_detection_time);
+	uint8_t i;
+	int16_t min;
+	int16_t max;
+
+	if ((count == 0) || (count > AVGS_BUFFER_LEN) || (ring_buf_temp_avgs_used < count))
+	{
+		return;
+	}
+
+	i = (ring_buf_temp_avgs_pos + AVGS_BUFFER_LEN - count) % AVGS_BUFFER_LEN;
+	min = ring_buf_temp_avgs[i];
+	max = min;
+	while (--count)
+	{
+		int16_t x;
+		i = (i + 1) % AVGS_BUFFER_LEN;
+		x = ring_buf_temp_avgs[i];
+		if (x < min) min = x;
+		if (x > max) max = x;
+	}
+	if ((temp_average - min) > (int16_t)config.window_close_detection_diff)
+	{
+		if (CTL_mode_window != 0)
+		{
+			CTL_mode_window = 0;
+			PID_force_update = 0;
+		}
+	}
+	else if ((CTL_mode_window == 0) && ((max - temp_average) > (int16_t)config.window_open_detection_diff))
+	{
+		CTL_mode_window = config.window_open_timeout;
+		PID_force_update = 0;
 	}
 }
 #endif
@@ -182,7 +267,12 @@ static void CTL_window_detection(void)
  ******************************************************************************/
 void CTL_update(bool minute_ch)
 {
-#if (HW_WINDOW_DETECTION)
+#if WINDOW_DETECTION_RUNTIME
+	if (config.window_detection_mode == WINDOW_DETECTION_HARDWARE)
+	{
+		PORTE |= _BV(PE2); // enable pull-up early so the input can settle before sampling
+	}
+#elif HW_WINDOW_DETECTION
 	PORTE |= _BV(PE2); // enable pull-up
 #endif
 

@@ -88,6 +88,47 @@ bool reboot = false;
 #warning "This code has not been tested with older versions."
 #endif
 
+#if MOTOR_AUTO_RESYNC
+#define MOTOR_RESYNC_OVER_TEMP        100        /* 1.00 C, temp unit is 0.01 C */
+#define MOTOR_RESYNC_MINUTES          15
+#define MOTOR_RESYNC_COOLDOWN_MINUTES (12 * 60)
+
+static uint16_t motor_resync_cooldown = 0;
+static uint8_t motor_resync_minutes = 0;
+
+static void motor_resync_update(void)
+{
+	if (motor_resync_cooldown > 0)
+	{
+		motor_resync_cooldown--;
+	}
+
+	if ((motor_resync_cooldown != 0)
+	    || MOTOR_CloseReferenceActive()
+	    || !MOTOR_IsCalibrated()
+	    || (MOTOR_Dir != stop)
+	    || mode_window()
+	    || (CTL_error & (CTL_ERR_MOTOR | CTL_ERR_MONTAGE | CTL_ERR_BATT_WARNING | CTL_ERR_BATT_LOW))
+	    || (CTL_temp_wanted < TEMP_MIN)
+	    || (CTL_temp_wanted > TEMP_MAX)
+	    || (valve_wanted > config.valve_min)
+	    || (temp_average < ((int16_t)CTL_temp_wanted * 50 + MOTOR_RESYNC_OVER_TEMP)))
+	{
+		motor_resync_minutes = 0;
+		return;
+	}
+
+	if (++motor_resync_minutes >= MOTOR_RESYNC_MINUTES)
+	{
+		if (MOTOR_StartCloseReference())
+		{
+			motor_resync_cooldown = MOTOR_RESYNC_COOLDOWN_MINUTES;
+		}
+		motor_resync_minutes = 0;
+	}
+}
+#endif
+
 /*!
  *******************************************************************************
  * main program
@@ -118,15 +159,18 @@ int __attribute__ ((noreturn)) main(void)
 	COM_init();
 #endif
 #if RFM
-	// enable persistent RX for initial sync
-	RFM_FIFO_ON();
-	RFM_RX_ON();
-	RFM_INT_EN();         // enable RFM interrupt
-	rfm_mode = rfmmode_rx;
+	if (rfm_available)
+	{
+		// enable persistent RX for initial sync
+		RFM_FIFO_ON();
+		RFM_RX_ON();
+		RFM_INT_EN();         // enable RFM interrupt
+		rfm_mode = rfmmode_rx;
+	}
 #endif
 
-	// We should do the following once here to have valid data from the start
-
+	// Start ADC immediately; motor movement waits for qualified battery data.
+	start_task_ADC();
 
 	/*!
 	 ****************************************************************************
@@ -179,7 +223,7 @@ int __attribute__ ((noreturn)) main(void)
 
 #if RFM
 		// RFM12
-		if (task & TASK_RFM)
+		if (rfm_available && (task & TASK_RFM))
 		{
 			task &= ~TASK_RFM;
 
@@ -222,13 +266,15 @@ int __attribute__ ((noreturn)) main(void)
 			continue; // on most case we have only 1 task, improve time to sleep
 		}
 
-		// communication
+#ifdef COM_UART
+		// local serial communication
 		if (task & TASK_COM)
 		{
 			task &= ~TASK_COM;
 			COM_commad_parse();
 			continue; // on most case we have only 1 task, improve time to sleep
 		}
+#endif
 
 		// motor stop
 		if (task & TASK_MOTOR_STOP)
@@ -276,7 +322,16 @@ int __attribute__ ((noreturn)) main(void)
 						// valve protection / CyCL
 						MOTOR_updateCalibration(0);
 					}
-#if (!HW_WINDOW_DETECTION)
+#if WINDOW_DETECTION_RUNTIME
+					if ((config.window_detection_mode == WINDOW_DETECTION_SOFTWARE) && (CTL_mode_window != 0))
+					{
+						CTL_mode_window--;
+						if (CTL_mode_window == 0)
+						{
+							PID_force_update = 0;
+						}
+					}
+#elif (!HW_WINDOW_DETECTION)
 					if (CTL_mode_window != 0)
 					{
 						CTL_mode_window--;
@@ -287,11 +342,14 @@ int __attribute__ ((noreturn)) main(void)
 					}
 #endif
 #if RFM
-					wirelesTimeSyncCheck();
+					if (rfm_available) wirelesTimeSyncCheck();
+#endif
+#if MOTOR_AUTO_RESYNC
+					motor_resync_update();
 #endif
 				}
 #if RFM
-				if ((config.RFM_devaddr != 0) && (time_sync_tmo > 1))
+				if (rfm_available && (config.RFM_devaddr != 0) && (time_sync_tmo > 1))
 				{
 					if (((RTC_GetSecond() == config.RFM_devaddr) && (wireless_buf_ptr)) ||
 					    (
@@ -329,7 +387,7 @@ int __attribute__ ((noreturn)) main(void)
 					}
 				}
 #endif
-				if (bat_average > 0)
+				if (ADC_BatteryReady())
 				{
 					MOTOR_updateCalibration(mont_contact_pooling());
 					MOTOR_Goto(valve_wanted);
@@ -346,7 +404,7 @@ int __attribute__ ((noreturn)) main(void)
 				display_task |= DISP_TASK_UPDATE;
 			}
 #if RFM
-			if (RTC_timer_done & _BV(RTC_TIMER_RFM))
+			if (rfm_available && (RTC_timer_done & _BV(RTC_TIMER_RFM)))
 			{
 				cli(); RTC_timer_done &= ~_BV(RTC_TIMER_RFM); sei();
 				wirelessTimer();
@@ -495,11 +553,20 @@ static inline void init(void)
 	//! Initialize the RTC
 	RTC_Init();
 
+	// Upgrade legacy window layouts before config_raw is loaded.
+	eeprom_layout_migrate();
+
 	// press all keys on boot reload default eeprom values
 	eeprom_config_init((PINB & (KBI_PROG | KBI_C | KBI_AUTO)) == 0);
 
 #if RFM
-	crypto_init();
+#if RFM_RUNTIME_DETECT
+	rfm_available = RFM_detect();
+#endif
+	if (rfm_available)
+	{
+		crypto_init();
+	}
 #endif
 
 	//! Initialize the motor
@@ -509,8 +576,11 @@ static inline void init(void)
 	LCD_Init();
 
 #if RFM
-	RFM_init();
-	RFM_OFF();
+	if (rfm_available)
+	{
+		RFM_init();
+		RFM_OFF();
+	}
 #endif
 
 	// init keyboard

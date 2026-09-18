@@ -529,6 +529,20 @@ void LCD_PrintHexW(uint16_t value, uint8_t mode)
 }
 
 
+static __attribute__((noinline)) void LCD_PrintTempUnit(uint8_t mode)
+{
+#ifdef HR25
+	LCD_PrintChar(LCD_CHAR_NULL, 3, mode);
+	LCD_SetSeg(LCD_DEGREE, mode);
+	LCD_SetSeg(LCD_SEG_CELCIUS, mode);
+	LCD_SetSeg(LCD_SEG_COL5, mode);
+#else
+	LCD_PrintChar(LCD_CHAR_C, 0, mode);
+	LCD_SetSeg(LCD_SEG_COL1, mode);
+#endif
+}
+
+
 /*!
  *******************************************************************************
  *  Print BYTE as temperature on LCD (desired temperature)
@@ -566,15 +580,10 @@ void LCD_PrintTemp(uint8_t temp, uint8_t mode)
 	{
 #ifdef HR25
 #define START_POS 0
-		LCD_PrintChar(LCD_CHAR_NULL, 3, mode);
-		LCD_SetSeg(LCD_DEGREE, mode);           // Display degrees sign
-		LCD_SetSeg(LCD_SEG_CELCIUS, mode);      // Display celsius sign
-		LCD_SetSeg(LCD_SEG_COL5, mode);         // decimal point
 #else
 #define START_POS 1
-		LCD_PrintChar(LCD_CHAR_C, 0, mode);     // Print C on last segment
-		LCD_SetSeg(LCD_SEG_COL1, mode);         // decimal point
 #endif
+		LCD_PrintTempUnit(mode);
 		LCD_PrintDec(temp >> 1, START_POS + 1, mode);
 		LCD_PrintChar(((temp & 1) ? 5 : 0), START_POS, mode);
 		if (temp < (100 / 5))
@@ -617,15 +626,10 @@ void LCD_PrintTempInt(int16_t temp, uint8_t mode)
 
 #ifdef HR25
 #define START_POS 0
-	LCD_PrintChar(LCD_CHAR_NULL, 3, mode);
-	LCD_SetSeg(LCD_DEGREE, mode);           // Display degrees sign
-	LCD_SetSeg(LCD_SEG_CELCIUS, mode);      // Display celsius sign
-	LCD_SetSeg(LCD_SEG_COL5, mode);         // decimal point
 #else
 #define START_POS 1
-	LCD_PrintChar(LCD_CHAR_C, 0, mode);     // Print C on last segment
-	LCD_SetSeg(LCD_SEG_COL1, mode);         // decimal point
 #endif
+	LCD_PrintTempUnit(mode);
 
 	// 1/100°C not printed
 	LCD_PrintDec3(temp / 10, START_POS, mode);
@@ -678,6 +682,11 @@ void LCD_SetHourBarSeg(uint8_t seg, uint8_t mode)
 {
 	uint8_t segment;
 
+	if (seg >= 24)
+	{
+		return;
+	}
+
 	// Get segment number for this element
 	segment = pgm_read_byte(&LCD_SegHourBarOffsetTablePrgMem[seg]);
 	// Set segment
@@ -696,29 +705,14 @@ void LCD_SetHourBarSeg(uint8_t seg, uint8_t mode)
  ******************************************************************************/
 void LCD_HourBarBitmap(uint32_t bitmap)
 {
-	asm volatile (
-		"    movw r14,r22                                     " "\n"
-		"    mov  r16,r24                                     " "\n"
-		"    ldi r28,lo8(LCD_SegHourBarOffsetTablePrgMem)     " "\n"
-		"    ldi r29,hi8(LCD_SegHourBarOffsetTablePrgMem)     " "\n"
-		"L2:                                                  " "\n"
-		"    movw r30,r28                                     " "\n"
-		"	 lpm r24, Z                                       ""\n"
-		"	 clr r22                                          ""\n"
-		"	 lsr r16                                          ""\n"
-		"	 ror r15                                          ""\n"
-		"	 ror r14                                          ""\n"
-		"    brcc L3                                          " "\n"
-		"    ldi r22,lo8(%0)                                  " "\n"
-		"L3:                                                  " "\n"
-		"	call LCD_SetSeg                                   ""\n"
-		"	adiw r28,1                                        ""\n"
-		"	cpi r28,lo8(LCD_SegHourBarOffsetTablePrgMem+24)   ""\n"
-		"	brne L2                                           ""\n"
-		:
-		: "I" (LCD_MODE_ON)
-		: "r14", "r15", "r16", "r28", "r29", "r30", "r31"
-	);
+	uint8_t i;
+
+	for (i = 0; i < 24; i++)
+	{
+		uint8_t segment = pgm_read_byte(&LCD_SegHourBarOffsetTablePrgMem[i]);
+		LCD_SetSeg(segment, (bitmap & 1UL) ? LCD_MODE_ON : LCD_MODE_OFF);
+		bitmap >>= 1;
+	}
 }
 
 
@@ -734,6 +728,10 @@ void LCD_HourBarBitmap(uint32_t bitmap)
  ******************************************************************************/
 void LCD_SetSeg(uint8_t seg, uint8_t mode)
 {
+	if (seg >= LCD_REGISTER_COUNT * 8)
+	{
+		return;
+	}
 	LCD_SetSegReg(seg / 8, 1 << (seg % 8), mode);
 }
 
@@ -750,6 +748,10 @@ void LCD_SetSeg(uint8_t seg, uint8_t mode)
  ******************************************************************************/
 void LCD_SetSegReg(uint8_t r, uint8_t b, uint8_t mode)
 {
+	if (r >= LCD_REGISTER_COUNT)
+	{
+		return;
+	}
 	// Set bits in each bitplane
 #if LCD_BITPLANES == 2
 	if (mode & 1)

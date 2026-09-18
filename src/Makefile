@@ -156,11 +156,9 @@ ADEFS = -DF_CPU=$(F_CPU) -DXTEA_ENC
 # Default options values, no manual flag overidden because of incompatibilites
 # Incompatibilities handled below with $(error ...)
 # Define RFM to 0 to disable support for the RFM Radio Moodule in the Code
-ifeq ($(HW),THERMOTRONIC)
- RFM?=0
-else
- RFM?=1
-endif
+# This fork defaults to a standalone thermostat. Radio targets in the top-level
+# Makefile pass RFM=1 explicitly.
+RFM?=0
 # Set default baud rate for RFM
 RFM_BAUD_RATE?=19200
 # Set default HR slave address, valid range is 1-28
@@ -183,13 +181,31 @@ RFM_TUNING?=1
 # Various options
 TEMP_COMPENSATE_OPTION?=0
 REMOTE_SETTING_ONLY?=$(RFM)
+RFM_RUNTIME_DETECT?=0
 HW_WINDOW_DETECTION?=0
+# Standalone HR20/HR25: compile both window algorithms and select at runtime.
+# Radio builds keep compile-time selection because PE2 can conflict with radio wiring.
+ifeq ($(RFM),0)
+ ifeq ($(HW),THERMOTRONIC)
+  WINDOW_DETECTION_RUNTIME?=0
+ else
+  WINDOW_DETECTION_RUNTIME?=1
+ endif
+else
+ WINDOW_DETECTION_RUNTIME?=0
+endif
+ifeq ($(WINDOW_DETECTION_RUNTIME),1)
+ ifeq ($(HW_WINDOW_DETECTION),1)
+  $(error ERROR: WINDOW_DETECTION_RUNTIME and HW_WINDOW_DETECTION cannot both be enabled.)
+ endif
+endif
 MENU_SHOW_BATTERY?=1
 MOTOR_COMPENSATE_BATTERY?=0
 NO_AUTORETURN_FROM_ALT_MENUES?=0
 CALIBRATION_RESETS_sumError?=0
 BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE?=0
 BOOST_CONTROLER_AFTER_CHANGE?=0
+MOTOR_AUTO_RESYNC?=1
 ifeq ($(RFM),1)
  RFM_WIRE?=JD_INTERNAL
 endif
@@ -246,6 +262,7 @@ CFLAGS = -g$(DEBUG)
 CFLAGS += $(CDEFS)
 CFLAGS += $(REV)
 CFLAGS += -DRFM=$(RFM)
+CFLAGS += -DRFM_RUNTIME_DETECT=$(RFM_RUNTIME_DETECT)
 ifeq ($(RFM),1)
 CFLAGS += -DRFM_BAUD_RATE=$(RFM_BAUD_RATE)
 CFLAGS += -DRFM_DEVICE_ADDRESS=$(RFM_DEVICE_ADDRESS)
@@ -263,6 +280,7 @@ CFLAGS += -DRFM_TUNING=$(RFM_TUNING)
 endif
 CFLAGS += -DTEMP_COMPENSATE_OPTION=$(TEMP_COMPENSATE_OPTION)
 CFLAGS += -DHW_WINDOW_DETECTION=$(HW_WINDOW_DETECTION)
+CFLAGS += -DWINDOW_DETECTION_RUNTIME=$(WINDOW_DETECTION_RUNTIME)
 CFLAGS += -DMENU_SHOW_BATTERY=$(MENU_SHOW_BATTERY)
 CFLAGS += -DMOTOR_COMPENSATE_BATTERY=$(MOTOR_COMPENSATE_BATTERY)
 CFLAGS += -DNO_AUTORETURN_FROM_ALT_MENUES=$(NO_AUTORETURN_FROM_ALT_MENUES)
@@ -270,6 +288,7 @@ CFLAGS += -DCALIBRATION_RESETS_sumError=$(CALIBRATION_RESETS_sumError)
 CFLAGS += -DREMOTE_SETTING_ONLY=$(REMOTE_SETTING_ONLY)
 CFLAGS += -DBLOCK_INTEGRATOR_AFTER_VALVE_CHANGE=$(BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE)
 CFLAGS += -DBOOST_CONTROLER_AFTER_CHANGE=$(BOOST_CONTROLER_AFTER_CHANGE)
+CFLAGS += -DMOTOR_AUTO_RESYNC=$(MOTOR_AUTO_RESYNC)
 ifeq ($(RFM_WIRE),MARIOJTAG)
  CFLAGS += -DRFM_WIRE_MARIOJTAG=1
 else
@@ -305,7 +324,16 @@ CFLAGS += -Wl,--relax
 #CFLAGS += --param inline-call-cost=2
 #CFLAGS += -ffunction-sections
 CFLAGS += -fdata-sections
+GC_SECTIONS?=0
+LTO?=0
+ifeq ($(GC_SECTIONS),1)
+CFLAGS += -ffunction-sections
+endif
+ifeq ($(LTO),1)
+CFLAGS += -flto
+else
 CFLAGS += -fno-toplevel-reorder
+endif
 
 ifeq ($(HW),THERMOTRONIC)
     CFLAGS += -DTHERMOTRONIC=1
@@ -384,6 +412,12 @@ LDFLAGS = -Wl,-Map=$(TARGET).map,--cref
 LDFLAGS += $(EXTMEMOPTS)
 LDFLAGS += $(patsubst %,-L%,$(EXTRALIBDIRS))
 LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
+ifeq ($(GC_SECTIONS),1)
+LDFLAGS += -Wl,--gc-sections
+endif
+ifeq ($(LTO),1)
+LDFLAGS += -flto
+endif
 #LDFLAGS += -T linker_script.x
 #LDFLAGS += --relax
 #LDFLAGS += --combine -fwhole-program
@@ -421,7 +455,11 @@ AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 # to submit bug reports.
 #AVRDUDE_VERBOSE = -v -v
 
-AVRDUDE_FLAGS = -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER) $(AVRDUDE_DELAY)
+# avr-gcc and avrdude use different part naming conventions.
+MCU_TO_PART=$(patsubst atmega%,m%,$(patsubst attiny%,t%,$1))
+AVRDUDE_PART = $(call MCU_TO_PART,$(MCU))
+
+AVRDUDE_FLAGS = -p $(AVRDUDE_PART) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER) $(AVRDUDE_DELAY)
 AVRDUDE_FLAGS += $(AVRDUDE_NO_VERIFY)
 AVRDUDE_FLAGS += $(AVRDUDE_VERBOSE)
 AVRDUDE_FLAGS += $(AVRDUDE_ERASE_COUNTER)
@@ -639,15 +677,18 @@ extcoff: $(TARGET).elf
 	@echo "RFM_FREQ_MAIN=$(RFM_FREQ_MAIN)" >> $@
 	@echo "RFM_FREQ_FINE=$(RFM_FREQ_FINE)" >> $@
 	@echo "RFM_TUNING=$(RFM_TUNING)" >> $@
+	@echo "RFM_RUNTIME_DETECT=$(RFM_RUNTIME_DETECT)" >> $@
 	@echo "TEMP_COMPENSATE_OPTION=$(TEMP_COMPENSATE_OPTION)" >> $@
 	@echo "REMOTE_SETTING_ONLY=$(REMOTE_SETTING_ONLY)" >> $@
 	@echo "HW_WINDOW_DETECTION=$(HW_WINDOW_DETECTION)" >> $@
+	@echo "WINDOW_DETECTION_RUNTIME=$(WINDOW_DETECTION_RUNTIME)" >> $@
 	@echo "MENU_SHOW_BATTERY=$(MENU_SHOW_BATTERY)" >> $@
 	@echo "MOTOR_COMPENSATE_BATTERY=$(MOTOR_COMPENSATE_BATTERY)" >> $@
 	@echo "NO_AUTORETURN_FROM_ALT_MENUES=$(NO_AUTORETURN_FROM_ALT_MENUES)" >> $@
 	@echo "CALIBRATION_RESETS_sumError=$(CALIBRATION_RESETS_sumError)" >> $@
 	@echo "BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE=$(BLOCK_INTEGRATOR_AFTER_VALVE_CHANGE)" >> $@
 	@echo "BOOST_CONTROLER_AFTER_CHANGE=$(BOOST_CONTROLER_AFTER_CHANGE)" >> $@
+	@echo "MOTOR_AUTO_RESYNC=$(MOTOR_AUTO_RESYNC)" >> $@
 	@echo "RFM_WIRE=$(RFM_WIRE)" >> $@
 	@echo "DISABLE_JTAG=$(DISABLE_JTAG)" >> $@
 	@echo "==================================" >> $@

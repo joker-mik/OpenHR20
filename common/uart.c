@@ -177,6 +177,7 @@ void UART_init(void)
  ******************************************************************************/
 void UART_startSend(void)
 {
+	uint8_t sreg = SREG;
 	cli();
 	if ((UCSR0B & _BV(UDRIE0)) == 0)
 	{
@@ -185,7 +186,7 @@ void UART_startSend(void)
 		UCSR0B |= _BV(UDRIE0) | _BV(TXEN0);
 		// UDR0 = COM_tx_char_isr(); // done in interrupt
 	}
-	sei();
+	SREG = sreg;
 }
 
 #if !defined(MASTER_CONFIG_H)

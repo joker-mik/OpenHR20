@@ -69,12 +69,21 @@ static int16_t ring_buf[2][AVERAGE_LEN];
 #if !HW_WINDOW_DETECTION
 int16_t ring_buf_temp_avgs [AVGS_BUFFER_LEN];
 uint8_t ring_buf_temp_avgs_pos = 0;
+uint8_t ring_buf_temp_avgs_used = 0;
 #endif
 
 static uint8_t ring_pos = 0;
 static uint8_t ring_used = 1;
 static int32_t ring_sum [2] = { 0, 0 };
 int16_t ring_average [2] = { 0, 0 };
+
+#define BATTERY_READY_SAMPLES 4
+static uint8_t battery_valid_samples = 0;
+
+bool ADC_BatteryReady(void)
+{
+	return battery_valid_samples >= BATTERY_READY_SAMPLES;
+}
 
 static void shift_ring(void)
 {
@@ -89,6 +98,10 @@ static void shift_ring(void)
 	{
 		ring_buf_temp_avgs[ring_buf_temp_avgs_pos] = temp_average;
 		ring_buf_temp_avgs_pos = (ring_buf_temp_avgs_pos + 1) % AVGS_BUFFER_LEN;
+		if (ring_buf_temp_avgs_used < AVGS_BUFFER_LEN)
+		{
+			ring_buf_temp_avgs_used++;
+		}
 	}
 #endif
 }
@@ -115,6 +128,11 @@ static void update_ring(uint8_t type, int16_t value)
 static int16_t ADC_Get_Bat_Voltage(uint16_t adc)             // Get Batteriy Voltage in mV
 {
 	uint32_t millivolt;
+
+	if (adc == 0)
+	{
+		return 0;
+	}
 
 	millivolt = 1126400;
 	millivolt /= adc;
@@ -220,7 +238,14 @@ REPEAT_ADC:
 #if DEBUG_BATT_ADC
 		COM_printStr16(PSTR("batAD x"), ad);
 #endif
-		update_ring(BAT_RING_TYPE, ADC_Get_Bat_Voltage(ad));
+		if (ad != 0)
+		{
+			update_ring(BAT_RING_TYPE, ADC_Get_Bat_Voltage(ad));
+			if (battery_valid_samples < BATTERY_READY_SAMPLES)
+			{
+				battery_valid_samples++;
+			}
+		}
 
 		// activate voltage divider
 		ADC_ACT_TEMP_P |= (1 << ADC_ACT_TEMP);

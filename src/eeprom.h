@@ -47,6 +47,10 @@
 
 #define EEPROM __attribute__((section(".eeprom")))
 
+#define WINDOW_DETECTION_OFF      0
+#define WINDOW_DETECTION_SOFTWARE 1
+#define WINDOW_DETECTION_HARDWARE 2
+
 typedef struct                                                  // each variables must be uint8_t or int8_t without exception
 {
 	/* 00 */ uint8_t lcd_contrast;
@@ -91,7 +95,16 @@ typedef struct                                                  // each variable
 	/*    */ uint8_t bat_warning_thld;                      //!< treshold for battery warning [unit 0.02V]=[unit 0.01V per cell]
 	/*    */ uint8_t bat_low_thld;                          //!< threshold for battery low [unit 0.02V]=[unit 0.01V per cell]
 	/*    */ uint8_t allow_ADC_during_motor;
-#if HW_WINDOW_DETECTION
+#if WINDOW_DETECTION_RUNTIME
+	/* 26 */ uint8_t window_detection_mode;                //!< 0=off, 1=software, 2=hardware PE2
+	/* 27 */ uint8_t window_open_detection_diff;           //!< software threshold, 0.01C
+	/* 28 */ uint8_t window_close_detection_diff;          //!< software threshold, 0.01C
+	/* 29 */ uint8_t window_open_detection_time;           //!< software sample window, 15 sec units
+	/* 2a */ uint8_t window_close_detection_time;          //!< software sample window, 15 sec units
+	/* 2b */ uint8_t window_open_timeout;                  //!< software maximum open time [minutes]
+	/* 2c */ uint8_t hw_window_open_detection_delay;       //!< hardware PE2 opening delay [sec]
+	/* 2d */ uint8_t hw_window_close_detection_delay;      //!< hardware PE2 closing delay [sec]
+#elif HW_WINDOW_DETECTION
 	/*    */ uint8_t window_open_detection_enable;
 	/*    */ uint8_t window_open_detection_delay;           //!< window open detection delay [sec]
 	/*    */ uint8_t window_close_detection_delay;          //!< window close detection delay [sec]
@@ -132,6 +145,7 @@ extern config_t config;
 
 extern uint16_t EEPROM ee_timers[8][RTC_TIMERS_PER_DOW];
 extern uint8_t EEPROM ee_layout;
+extern uint8_t EEPROM ee_reserved2_60[60];
 
 // Boot Timeslots -> move to CONFIG.H
 // 10 Minutes after BOOT_hh:00
@@ -140,7 +154,9 @@ extern uint8_t EEPROM ee_layout;
 #define BOOT_ON2      (16 * 60 + 0x2000)        //!<  16:00
 #define BOOT_OFF2     (21 * 60 + 0x1000)        //!<  21:00
 
-#if (HW_WINDOW_DETECTION)
+#if WINDOW_DETECTION_RUNTIME
+#define EE_LAYOUT (0x16)
+#elif (HW_WINDOW_DETECTION)
 #define EE_LAYOUT (0x15)
 #else
 #define EE_LAYOUT (0x14)
@@ -251,15 +267,24 @@ uint8_t EEPROM ee_config[][4] = {       // must be alligned to 4 bytes
 	/*    */ {                   120,                   120,       80,                       160 }, //!< bat_warning_thld; treshold for battery warning [unit 0.02V]=[unit 0.01V per cell]
 	/*    */ {                   100,                   100,       80,                       160 }, //!< bat_low_thld; treshold for battery low [unit 0.02V]=[unit 0.01V per cell]
 	/*    */ {                     1,                     1,        0,                         1 }, //!< allow_ADC_during_motor
-#if HW_WINDOW_DETECTION
+#if WINDOW_DETECTION_RUNTIME
+	/* 26 */ { WINDOW_DETECTION_SOFTWARE, WINDOW_DETECTION_SOFTWARE, WINDOW_DETECTION_OFF, WINDOW_DETECTION_HARDWARE }, //!< window_detection_mode
+	/* 27 */ {                    50,                    50,        7,                       255 }, //!< SW window_open_detection_diff, 0.01C
+	/* 28 */ {                    50,                    50,        7,                       255 }, //!< SW window_close_detection_diff, 0.01C
+	/* 29 */ {                     8,                     8,        1,           AVGS_BUFFER_LEN }, //!< SW window_open_detection_time, 15 sec
+	/* 2a */ {                     8,                     8,        1,           AVGS_BUFFER_LEN }, //!< SW window_close_detection_time, 15 sec
+	/* 2b */ {                    90,                    90,        2,                       255 }, //!< SW window_open_timeout, minutes
+	/* 2c */ {                     5,                     5,        0,                       240 }, //!< HW PE2 opening delay, sec
+	/* 2d */ {                     5,                     5,        0,                       240 }, //!< HW PE2 closing delay, sec
+#elif HW_WINDOW_DETECTION
 	/*    */ {                     1,                     1,        0,                         1 }, //!< window_open_detection_enable
 	/*    */ {                     5,                     5,        0,                       240 }, //!< window_open_detection_delay [sec] max 4 minutes
 	/*    */ {                     5,                     5,        0,                       240 }, //!< window_close_detection_delay [sec] max 4 minutes
 #else
-	/*    */ {                    50,                    50,        7,                       255 }, //!< window_open_detection_diff; reshold for window open/close detection unit is 0.01C
-	/*    */ {                    50,                    50,        7,                       255 }, //!< window_close_detection_diff; reshold for window open/close detection unit is 0.01C
-	/*    */ {                     8,                     8,        1,           AVGS_BUFFER_LEN }, //!< window_open_detection_time unit 15sec = 1/4min
-	/*    */ {                     8,                     8,        1,           AVGS_BUFFER_LEN }, //!< window_close_detection_time unit 15sec = 1/4min
+	/*    */ {                    50,                    50,        7,                       255 }, //!< window_open_detection_diff; threshold unit is 0.01C
+	/*    */ {                    50,                    50,        7,                       255 }, //!< window_close_detection_diff; threshold unit is 0.01C
+	/*    */ {                     8,                     8,        1,           AVGS_BUFFER_LEN }, //!< window_open_detection_time unit 15sec
+	/*    */ {                     8,                     8,        1,           AVGS_BUFFER_LEN }, //!< window_close_detection_time unit 15sec
 	/*    */ {                    90,                    90,        2,                       255 }, //!< window_open_timeout
 #endif
 #if BOOST_CONTROLER_AFTER_CHANGE
@@ -297,6 +322,7 @@ uint8_t EEPROM ee_config[][4] = {       // must be alligned to 4 bytes
 uint8_t config_read(uint8_t cfg_address, uint8_t cfg_type);
 uint8_t EEPROM_read(uint16_t address);
 void EEPROM_write(uint16_t address, uint8_t data);
+void eeprom_layout_migrate(void);
 void eeprom_config_init(bool restore_default);
 void eeprom_config_save(uint8_t idx);
 

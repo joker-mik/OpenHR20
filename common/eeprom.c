@@ -109,6 +109,8 @@ uint8_t config_read(uint8_t cfg_address, uint8_t cfg_type)
 
 void EEPROM_write(uint16_t address, uint8_t data)
 {
+	uint8_t sreg;
+
 	/* Wait for completion of previous write */
 	while (EECR & (1 << EEWE))
 	{
@@ -116,12 +118,126 @@ void EEPROM_write(uint16_t address, uint8_t data)
 	}
 	EEAR = address;
 	EEDR = data;
-	asm ("cli");
+	sreg = SREG;
+	cli();
 	EECR |= (1 << EEMWE);
 	EECR |= (1 << EEWE);
-	asm ("sei");
+	SREG = sreg;
 }
 
+
+#if WINDOW_DETECTION_RUNTIME && !BOOST_CONTROLER_AFTER_CHANGE && !TEMP_COMPENSATE_OPTION
+#define EE_LAYOUT_LEGACY_SOFTWARE 0x14
+#define EE_LAYOUT_LEGACY_HARDWARE 0x15
+#define EE_MIG_MAGIC0 0x57
+#define EE_MIG_MAGIC1 0x4d
+#define EE_MIG_OLD_FIRST ((uint8_t)OFFSETOF(config_t, window_detection_mode))
+#define EE_MIG_OLD_COUNT 5
+#define EE_CFG_IDX(field) ((uint8_t)OFFSETOF(config_t, field))
+
+static uint8_t eeprom_old_config_value(uint8_t idx)
+{
+	return EEPROM_read((uint16_t)&ee_config + ((uint16_t)idx << 2) + CONFIG_VALUE);
+}
+
+static void eeprom_config_record_write(uint8_t idx, uint8_t value, uint8_t def, uint8_t min, uint8_t max)
+{
+	uint16_t base = (uint16_t)&ee_config + ((uint16_t)idx << 2);
+	EEPROM_write(base + CONFIG_VALUE, value);
+	EEPROM_write(base + CONFIG_DEFAULT, def);
+	EEPROM_write(base + CONFIG_MIN, min);
+	EEPROM_write(base + CONFIG_MAX, max);
+}
+
+void eeprom_layout_migrate(void)
+{
+	uint8_t old_layout = EEPROM_read((uint16_t)&ee_layout);
+	uint8_t staged_layout = EEPROM_read((uint16_t)&ee_reserved2_60[2]);
+	uint8_t old_value[EE_MIG_OLD_COUNT];
+	uint8_t i;
+	bool staged;
+
+	staged = (EEPROM_read((uint16_t)&ee_reserved2_60[0]) == EE_MIG_MAGIC0)
+		 && (EEPROM_read((uint16_t)&ee_reserved2_60[1]) == EE_MIG_MAGIC1)
+		 && ((staged_layout == EE_LAYOUT_LEGACY_SOFTWARE) || (staged_layout == EE_LAYOUT_LEGACY_HARDWARE));
+
+	if (old_layout == EE_LAYOUT)
+	{
+		/* A reset after committing ee_layout may leave the scratch header valid. */
+		if (staged)
+		{
+			EEPROM_write((uint16_t)&ee_reserved2_60[0], 0);
+			EEPROM_write((uint16_t)&ee_reserved2_60[1], 0);
+		}
+		return;
+	}
+
+	if (staged)
+	{
+		/* Staging is authoritative even if a power loss corrupted ee_layout mid-write. */
+		old_layout = staged_layout;
+		for (i = 0; i < EE_MIG_OLD_COUNT; i++)
+		{
+			old_value[i] = EEPROM_read((uint16_t)&ee_reserved2_60[3 + i]);
+		}
+	}
+	else
+	{
+		uint8_t old_count;
+		if ((old_layout != EE_LAYOUT_LEGACY_SOFTWARE) && (old_layout != EE_LAYOUT_LEGACY_HARDWARE))
+		{
+			return;
+		}
+		old_count = (old_layout == EE_LAYOUT_LEGACY_SOFTWARE) ? 5 : 3;
+
+		/* Invalidate the staging header before filling it. */
+		EEPROM_write((uint16_t)&ee_reserved2_60[0], 0);
+		EEPROM_write((uint16_t)&ee_reserved2_60[1], 0);
+		EEPROM_write((uint16_t)&ee_reserved2_60[2], old_layout);
+		for (i = 0; i < EE_MIG_OLD_COUNT; i++)
+		{
+			old_value[i] = (i < old_count) ? eeprom_old_config_value(EE_MIG_OLD_FIRST + i) : 0xff;
+			EEPROM_write((uint16_t)&ee_reserved2_60[3 + i], old_value[i]);
+		}
+		/* Header becomes valid only after all legacy values are safely staged. */
+		EEPROM_write((uint16_t)&ee_reserved2_60[1], EE_MIG_MAGIC1);
+		EEPROM_write((uint16_t)&ee_reserved2_60[0], EE_MIG_MAGIC0);
+	}
+
+	if (old_layout == EE_LAYOUT_LEGACY_SOFTWARE)
+	{
+		eeprom_config_record_write(EE_CFG_IDX(window_detection_mode), WINDOW_DETECTION_SOFTWARE, WINDOW_DETECTION_SOFTWARE, WINDOW_DETECTION_OFF, WINDOW_DETECTION_HARDWARE);
+		eeprom_config_record_write(EE_CFG_IDX(window_open_detection_diff), old_value[0], 50, 7, 255);
+		eeprom_config_record_write(EE_CFG_IDX(window_close_detection_diff), old_value[1], 50, 7, 255);
+		eeprom_config_record_write(EE_CFG_IDX(window_open_detection_time), old_value[2], 8, 1, AVGS_BUFFER_LEN);
+		eeprom_config_record_write(EE_CFG_IDX(window_close_detection_time), old_value[3], 8, 1, AVGS_BUFFER_LEN);
+		eeprom_config_record_write(EE_CFG_IDX(window_open_timeout), old_value[4], 90, 2, 255);
+		eeprom_config_record_write(EE_CFG_IDX(hw_window_open_detection_delay), 5, 5, 0, 240);
+		eeprom_config_record_write(EE_CFG_IDX(hw_window_close_detection_delay), 5, 5, 0, 240);
+	}
+	else
+	{
+		eeprom_config_record_write(EE_CFG_IDX(window_detection_mode), old_value[0] ? WINDOW_DETECTION_HARDWARE : WINDOW_DETECTION_OFF,
+		                           WINDOW_DETECTION_SOFTWARE, WINDOW_DETECTION_OFF, WINDOW_DETECTION_HARDWARE);
+		eeprom_config_record_write(EE_CFG_IDX(window_open_detection_diff), 50, 50, 7, 255);
+		eeprom_config_record_write(EE_CFG_IDX(window_close_detection_diff), 50, 50, 7, 255);
+		eeprom_config_record_write(EE_CFG_IDX(window_open_detection_time), 8, 8, 1, AVGS_BUFFER_LEN);
+		eeprom_config_record_write(EE_CFG_IDX(window_close_detection_time), 8, 8, 1, AVGS_BUFFER_LEN);
+		eeprom_config_record_write(EE_CFG_IDX(window_open_timeout), 90, 90, 2, 255);
+		eeprom_config_record_write(EE_CFG_IDX(hw_window_open_detection_delay), old_value[1], 5, 0, 240);
+		eeprom_config_record_write(EE_CFG_IDX(hw_window_close_detection_delay), old_value[2], 5, 0, 240);
+	}
+
+	/* Commit marker last. If power fails earlier, the staged legacy values allow a safe retry. */
+	EEPROM_write((uint16_t)&ee_layout, EE_LAYOUT);
+	EEPROM_write((uint16_t)&ee_reserved2_60[0], 0);
+	EEPROM_write((uint16_t)&ee_reserved2_60[1], 0);
+}
+#else
+void eeprom_layout_migrate(void)
+{
+}
+#endif
 
 
 /*!
@@ -195,6 +311,10 @@ uint16_t timers_patch_data;
  ******************************************************************************/
 uint16_t eeprom_timers_read_raw(uint8_t offset)
 {
+	if (offset >= (uint8_t)(sizeof(ee_timers) / sizeof(ee_timers[0][0])))
+	{
+		return 0xffff;
+	}
 	if (offset != timers_patch_offset)
 	{
 		uint16_t eeaddr = (uint16_t)offset * (uint16_t)sizeof(ee_timers[0][0]) + (uint16_t)ee_timers;

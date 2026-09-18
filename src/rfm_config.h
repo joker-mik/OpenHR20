@@ -65,6 +65,7 @@
 
 #define RFM_SDO_DDR                     DDRE
 #define RFM_SDO_PIN                     PINE
+#define RFM_SDO_PORT                    PORTE
 #define RFM_SDO_BITPOS          2
 
 #define RFM_SDO_PCINT           PCINT2
@@ -89,6 +90,7 @@
 
 #define RFM_SDO_DDR                     DDRE
 #define RFM_SDO_PIN                     PINE
+#define RFM_SDO_PORT                    PORTE
 #define RFM_SDO_BITPOS          6
 
 #define RFM_SDO_PCINT           PCINT6
@@ -107,6 +109,7 @@
 
 #define RFM_SDO_DDR                     DDRE
 #define RFM_SDO_PIN                     PINE
+#define RFM_SDO_PORT                    PORTE
 #define RFM_SDO_BITPOS          6
 
 #define RFM_SDO_PCINT           PCINT6

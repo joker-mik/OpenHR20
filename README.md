@@ -1,50 +1,146 @@
 # OpenHR20
 
-[![Build Status](https://travis-ci.org/OpenHR20/OpenHR20.svg?branch=master)](https://travis-ci.org/OpenHR20/OpenHR20)
+[![Reliability build](https://github.com/joker-mik/OpenHR20/actions/workflows/reliability-build.yml/badge.svg)](https://github.com/joker-mik/OpenHR20/actions/workflows/reliability-build.yml)
 
-This repository contains open firmware for Honeywell Rondostat HR20 and similar, Atmega-MCU based radiator thermostats. It is not based on the original, proprietary firmware, but rather a complete rewrite. It was started around 2008 by Jiri Dobry and Dario Carluccio, but has been changed and extended by many people since.
+OpenHR20 is open firmware for Honeywell Rondostat HR20 and related ATmega-based radiator thermostats. It is a complete open-source firmware implementation and is not based on Honeywell's proprietary firmware.
 
-Currently supported thermostats are:
-* HR20
-* HR25
-* THERMOTRONIC
+This fork keeps the original HR20/HR25 functionality while adding reliability fixes, safer motor/calendar handling, runtime window-detection selection, optional RFM12B support and reproducible CI memory checks.
 
-Main improvements of this firmware are addition of wireless and/or wired communication with central hub.
+Supported thermostat families:
 
+- Honeywell HR20
+- Honeywell HR25
+- Thermotronic
 
-Original repository is still available at [SourceForge](https://sourceforge.net/projects/openhr20/). Original description page with a lot of interesting information is available in German [here](https://www.mikrocontroller.net/articles/Heizungssteuerung_mit_Honeywell_HR20).
+## Recommended HR20 build
 
-## Compiling
+For most HR20 installations, use:
 
-As installing this firmware needs flashing a program to the thermostat MCU with hardware programmer, at least basic understanding of working with AVR MCUs and some additional hardware is required.
+```sh
+make HR20_universal_jd
+```
 
-To compile the sources, avr compatible gcc crosscompiler is required. On many linux distributions, you can install this via packages, e.g. on debian based distros, installing "gcc-avr" package should install the whole required toolchain. For flashing, "avrdude" package is also required. For Windows, the [WinAVR](https://sourceforge.net/projects/winavr/) package should get you all the tools needed.
+`HR20_universal_jd` provides:
 
-To compile the default configuration - HR20 version with RFM12B radio:
+- normal local operation with wheel and keys;
+- optional JD_INTERNAL RFM12B detected at runtime;
+- the same HEX with or without the RFM module fitted;
+- RFM frequency tuning;
+- software window detection;
+- PE2 hardware window-contact detection;
+- runtime selection of window-detection mode;
+- JTAG pins left available because JD_INTERNAL does not use them.
 
-`make`
+The universal build is checked in CI against the ATmega169P limits of 16 KiB flash and 1 KiB SRAM.
 
-To compile the sources without wireless extension:
+## Which build do I need?
 
-`make RFM=0`
+| Hardware / setup | Build |
+| --- | --- |
+| HR20, recommended universal JD_INTERNAL setup | `HR20_universal_jd` |
+| HR20 without RFM | `HR20_original_sww` |
+| HR20 with JD_INTERNAL RFM, software window detection | `HR20_rfm_int_sww` |
+| HR20 with JD_INTERNAL RFM, hardware PE2 window detection | `HR20_rfm_int_hww` |
+| HR20 with MARIOJTAG RFM | `HR20_rfm_ext_sww` |
+| HR25 without RFM | `HR25_original_sww` |
+| HR25 with TK_INTERNAL RFM | `HR25_rfm_int_sww` |
+| Thermotronic | `thermotronic_sww` |
+| RFM master/gateway | `rfm_master` |
 
-To compile with predefined REVision ID
+Build all supported targets with:
 
-`make REV=-DREVISION=\\\"123456_XYZ\\\"`
+```sh
+make all
+```
 
-To compile with hardware window open contact
+## Documentation
 
-`make HW_WINDOW_DETECTION=1`
+Use the README as the project start page; detailed information is split into focused guides:
 
-thermotronic HW
+- **[User guide](docs/USER_GUIDE.md)** — wheel/buttons, long-press combinations, date/time, timers, preset temperatures, key lock, service menu and window handling.
+- **[UART reference](docs/UART.md)** — 9600-baud serial interface, pinout, command syntax and all local commands.
+- **[RFM12B guide](docs/RFM.md)** — JD_INTERNAL, MARIOJTAG, TK_INTERNAL, runtime detection, tuning and protocol notes.
+- **[Build guide](docs/BUILD.md)** — toolchain, build matrix, JTAG behaviour, artifacts and CI memory limits.
+- **[Configuration reference](docs/CONFIGURATION.md)** — EEPROM/service-menu parameters, window detection, motor calibration, battery and RFM settings.
+- **[Reliability notes](RELIABILITY.md)** — reliability-oriented changes and design notes.
 
-`make HW=THERMOTRONIC`
+## Quick local operation
 
-## PINOUT HR20
+The front panel uses **PROG**, **C**, **AUTO** and the rotary wheel.
 
-The externally accesible connector on HR20/25 thermostats allows direct connection to the MCU for flashing via JTAG, or for wired communication. The connector layout is:
+Common actions:
 
-| ATmega169PV | <Func>(<Port,Pin>/<No.>) | | | |
-| --- | ----------- | ----------- | ----------- | ------------ |
-| Vcc | RXD(PE0/02) | TDO(PF6/55) | TMS(PF5/56) | /RST(PG5/20) |
-| GND | TDI(PF7/54) | TXD(PE1/03) | TCK(PF4/57) |     (PE2/04) |
+| Control | Action |
+| --- | --- |
+| Wheel | change requested temperature |
+| AUTO | change operating mode |
+| C | cycle alternate home displays |
+| Long AUTO | date/time setup |
+| Long PROG | switching-time setup |
+| Long C | preset-temperature setup |
+| Long AUTO + C | toggle key lock |
+| Long PROG + AUTO | toggle software-window state when software detection is active |
+| Long PROG + C + AUTO | service menu |
+
+See the [User guide](docs/USER_GUIDE.md) for the complete behaviour.
+
+## UART at a glance
+
+Non-RFM HR20 builds expose the local UART at **9600 baud** on PE0/PE1.
+
+The command set includes version/status, watch variables, configuration, timers, date/time, target temperature, mode, key lock and reboot.
+
+Examples:
+
+```text
+V
+D
+Gff
+L02
+```
+
+See the [UART reference](docs/UART.md) for exact command formats.
+
+RFM builds use the corresponding binary wireless command protocol instead of compiling the local ASCII UART parser.
+
+## RFM12B and JTAG
+
+The recommended universal HR20 radio wiring is **JD_INTERNAL**:
+
+| Signal | AVR pin |
+| --- | --- |
+| SCK | PF1 |
+| SDI | PF0 |
+| nSEL | PA3 |
+| SDO | PE6 / PCINT6 |
+
+JD_INTERNAL leaves PE2 free for a hardware window contact and does not require JTAG to be disabled.
+
+**MARIOJTAG** reuses JTAG pins and PE2; therefore JTAG must be disabled and PE2 hardware window detection is incompatible with that wiring.
+
+See the [RFM guide](docs/RFM.md) for details.
+
+## HR20 external connector
+
+| ATmega169PV | Function / MCU pin |  |  |  |
+| --- | --- | --- | --- | --- |
+| Vcc | RXD (PE0/02) | TDO (PF6/55) | TMS (PF5/56) | /RST (PG5/20) |
+| GND | TDI (PF7/54) | TXD (PE1/03) | TCK (PF4/57) | PE2/04 |
+
+The connector can be used for programming/JTAG and wired UART communication.
+
+## Build requirements
+
+An AVR-compatible GCC toolchain and AVR libc are required. On Debian-based systems, typical packages are `gcc-avr`, `avr-libc`, `make` and `avrdude`.
+
+The GitHub Actions reliability build uses a pinned AVR toolchain and checks the supported firmware matrix, static analysis, EEPROM layout, feature profile and universal HR20 memory limits.
+
+## Project history
+
+OpenHR20 was started around 2008 by Jiri Dobry and Dario Carluccio and has since been extended by many contributors.
+
+The historical project remains available on [SourceForge](https://sourceforge.net/projects/openhr20/). A detailed German description of the original project is available at [mikrocontroller.net](https://www.mikrocontroller.net/articles/Heizungssteuerung_mit_Honeywell_HR20).
+
+## License
+
+The source files retain their original copyright and license notices. See `src/license.txt`.

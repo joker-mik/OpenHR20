@@ -65,7 +65,7 @@
 
 // our Version
 #define REVHIGH  1                                      //! Revision number high
-#define REVLOW   1                                      //! Revision number low
+#define REVLOW   4                                      //! Revision number low
 #define VERSION_N (0x0000 + REVLOW + (REVHIGH << 8))    //! Version as HEX value F0.92 (E for Experimental)
 
 
@@ -78,7 +78,9 @@
 #if THERMOTRONIC != 1 //No serialport implementet yet
 // Note we should only enable of of the following at one time
 /* we support UART */
-//#define COM_UART 1
+#if !RFM
+#define COM_UART 1
+#endif
 
 /* Our default Adress, if not set or invalid */
 /* #define COM_DEF_ADR 1 */

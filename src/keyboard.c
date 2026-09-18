@@ -41,6 +41,8 @@
 #include "task.h"
 #include "keyboard.h"
 #include "controller.h"
+#include "eeprom.h"
+#include "menu.h"
 #include "debug.h"
 #include "common/rtc.h"
 
@@ -192,6 +194,26 @@ void task_keyboard_long_press_detect(void)
 			case KBI_AUTO | KBI_C:
 				kb_events |= KB_EVENT_LOCK_LONG;
 				break;
+#if WINDOW_DETECTION_RUNTIME
+			case KBI_PROG | KBI_AUTO:
+				/* Manual software-window toggle. Hardware PE2 remains authoritative in HW mode. */
+				if (!menu_locked && (config.window_detection_mode == WINDOW_DETECTION_SOFTWARE))
+				{
+					CTL_mode_window = mode_window() ? 0 : config.window_open_timeout;
+					PID_force_update = 0;
+					kb_events |= KB_EVENT_NONE_LONG | KB_EVENT_UPDATE_LCD;
+				}
+				break;
+#elif !HW_WINDOW_DETECTION
+			case KBI_PROG | KBI_AUTO:
+				if (!menu_locked)
+				{
+					CTL_mode_window = mode_window() ? 0 : config.window_open_timeout;
+					PID_force_update = 0;
+					kb_events |= KB_EVENT_NONE_LONG | KB_EVENT_UPDATE_LCD;
+				}
+				break;
+#endif
 			case KBI_PROG | KBI_C | KBI_AUTO:
 				kb_events |= KB_EVENT_ALL_LONG;
 				break;

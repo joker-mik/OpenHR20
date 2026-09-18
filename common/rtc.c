@@ -77,9 +77,24 @@ static uint8_t RTC_DaysOfMonth(void);           // how many days in (RTC_MM, RTC
 static void    RTC_SetDayOfWeek(void);          // calc day of week (RTC_DD, RTC_MM, RTC_YY)
 static bool    RTC_IsLastSunday(void);          // check actual date if last sun in mar/oct
 
-// year mod 100 = 0 is only every 400 years a leap year
-// we calculate only till the year 2255, so don't care
-#define RTC_NoLeapyear() (RTC.YY % 4)
+/*
+ * Gregorian leap-year rules:
+ *  - years divisible by 4 are leap years,
+ *  - except years divisible by 100,
+ *  - unless they are also divisible by 400.
+ *
+ * RTC.YY stores the offset from 2000 (0..255 => 2000..2255), therefore
+ * the full calendar year must be used for the century rules.
+ */
+static bool RTC_IsLeapYear(void)
+{
+	/*
+	 * RTC.YY is restricted to 0..255 => calendar years 2000..2255.
+	 * In this range the Gregorian century exceptions are only 2100 and 2200;
+	 * 2000 remains a leap year because it is divisible by 400.
+	 */
+	return ((RTC.YY & 3U) == 0U) && (RTC.YY != 100U) && (RTC.YY != 200U);
+}
 
 // Progmem constants
 
@@ -156,6 +171,10 @@ void RTC_SetDay(int8_t day)
 void RTC_SetMonth(int8_t month)
 {
 	RTC.MM = (uint8_t)(month + (-1 + 12)) % 12 + 1;
+	if (RTC.DD > RTC_DaysOfMonth())
+	{
+		RTC.DD = RTC_DaysOfMonth();
+	}
 	RTC_SetDayOfWeek();
 }
 
@@ -167,6 +186,10 @@ void RTC_SetMonth(int8_t month)
 void RTC_SetYear(uint8_t year)
 {
 	RTC.YY = year;
+	if (RTC.DD > RTC_DaysOfMonth())
+	{
+		RTC.DD = RTC_DaysOfMonth();
+	}
 	RTC_SetDayOfWeek();
 }
 
@@ -292,7 +315,7 @@ uint16_t RTC_DowTimerGet(rtc_dow_t dow, uint8_t slot, timermode_t *timermode)
  *  \returns  index of timer
  *
  ******************************************************************************/
-static uint8_t RTC_FindTimerRawIndex(uint8_t dow, uint16_t time_minutes)
+static int8_t RTC_FindTimerRawIndex(uint8_t dow, uint16_t time_minutes)
 {
 	uint8_t search_timers = (dow > 0) ? 8 : 2;
 	int8_t raw_index = -1;
@@ -395,12 +418,13 @@ uint8_t RTC_ActualTimerTemperatureType(bool exact)
 	uint16_t minutes = RTC.hh * 60 + RTC.mm;
 	int8_t dow = ((config.timer_mode == 1) ? RTC.DOW : 0);
 	int8_t raw_index = RTC_FindTimerRawIndex(dow, minutes);
-	uint16_t data = eeprom_timers_read_raw(raw_index);
+	uint16_t data;
 
 	if (raw_index < 0)
 	{
 		return TEMP_TYPE_INVALID;            //not found
 	}
+	data = eeprom_timers_read_raw((uint8_t)raw_index);
 	if (exact)
 	{
 		if ((data & 0xfff) != minutes)
@@ -496,6 +520,13 @@ static void RTC_AddOneDay(void)
 		RTC.DD = 1;
 		if (++RTC.MM > 12)              // Next year
 		{
+			if (RTC.YY == 255)
+			{
+				// rtc_t cannot represent years after 2255; saturate instead of wrapping to 2000.
+				RTC.MM = 12;
+				RTC.DD = 31;
+				return;
+			}
 			RTC.MM = 1;
 			RTC.YY++;
 		}
@@ -521,7 +552,7 @@ static uint8_t RTC_DaysOfMonth()
 {
 	uint8_t dom = pgm_read_byte(&RTC_DayOfMonthTablePrgMem[RTC.MM - 1]);
 
-	if ((RTC.MM == 2) && (!RTC_NoLeapyear()))
+	if ((RTC.MM == 2) && RTC_IsLeapYear())
 	{
 		return 29; // leapyear feb=29
 	}
@@ -550,7 +581,7 @@ static bool RTC_IsLastSunday(void)
 	else if (RTC.MM == 10)
 	{
 		// last seven days of month
-		return RTC.DD > (30 - 7);
+		return RTC.DD > (31 - 7);
 	}
 	else
 	{
@@ -569,39 +600,52 @@ static bool RTC_IsLastSunday(void)
  *  \return 1=monday to 7=sunday
  *
  ******************************************************************************/
-static const uint16_t daysInYear [12] PROGMEM = {
-	0,
-	31,
-	31 + 28,
-	31 + 28 + 31,
-	31 + 28 + 31 + 30,
-	31 + 28 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30
+static const uint8_t RTC_MonthOffsetTablePrgMem[12] PROGMEM = {
+	0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4
 };
 
 static void RTC_SetDayOfWeek(void)
 {
-	uint16_t day_of_year;
+	uint8_t yy = RTC.YY;
+	uint8_t century_correction;
 	uint16_t tmp_dow;
 
-	// Day of year
-	day_of_year = pgm_read_word(&(daysInYear[RTC.MM - 1])) + RTC.DD;
-	if (RTC.MM > 2)   // february
+	/*
+	 * Gregorian weekday calculation specialized for the representable
+	 * 2000..2255 range. For year 2000+n:
+	 *
+	 *   year + year/4 - year/100 + year/400
+	 *
+	 * is congruent modulo 7 to:
+	 *
+	 *   n + n/4 - n/100
+	 *
+	 * because the constant term for year 2000 is exactly divisible by 7.
+	 * January/February use the previous year, as in the standard formula.
+	 */
+	if (RTC.MM < 3)
 	{
-		if (!RTC_NoLeapyear())
+		if (yy == 0)
 		{
-			day_of_year++;
+			/* Previous year is 1999; its Gregorian year term is 5 mod 7. */
+			tmp_dow = 5;
+			goto add_month_day;
 		}
+		yy--;
 	}
-	// calc weekday
-	tmp_dow = RTC.YY + ((RTC.YY - 1) / 4) - ((RTC.YY - 1) / 100) + day_of_year;
-	// set DOW
-	RTC.DOW = (uint8_t)((tmp_dow + 5) % 7) + 1;
+
+	century_correction = (yy >= 200U) ? 2U : ((yy >= 100U) ? 1U : 0U);
+	tmp_dow = (uint16_t)yy + (yy >> 2) - century_correction;
+
+add_month_day:
+	tmp_dow += pgm_read_byte(&RTC_MonthOffsetTablePrgMem[RTC.MM - 1]) + RTC.DD;
+
+	// Formula returns 0=Sunday, 1=Monday, ... 6=Saturday.
+	RTC.DOW = (uint8_t)(tmp_dow % 7U);
+	if (RTC.DOW == 0)
+	{
+		RTC.DOW = 7;
+	}
 
 #if !defined(MASTER_CONFIG_H)
 	menu_update_hourbar((config.timer_mode == 1) ? RTC.DOW : 0);
@@ -618,13 +662,19 @@ static uint8_t RTC_next_compare;
 void RTC_timer_set(uint8_t timer_id, uint8_t time)
 {
 	uint8_t t2, i, next, dif;
+	uint8_t sreg;
 
-	// next is uninitialized, it is correct
+	if ((timer_id == 0) || (timer_id > RTC_TIMERS))
+	{
+		return;
+	}
 
+	sreg = SREG;
 	cli();
 	RTC_timer_todo |= _BV(timer_id);
 	RTC_timer_time[timer_id - 1] = time;
 	t2 = TCNT2;
+	next = t2;
 	dif = 255;
 	for (i = 0; i < RTC_TIMERS; i++)
 	{
@@ -638,12 +688,7 @@ void RTC_timer_set(uint8_t timer_id, uint8_t time)
 		}
 	}
 
-// Ignore maybe ununitialized for next, following above comment
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-
 #if defined(MASTER_CONFIG_H)
-	// cppcheck-suppress uninitvar
 	RTC_next_compare = next;
 #else
 	if (OCR2A != next)
@@ -656,9 +701,7 @@ void RTC_timer_set(uint8_t timer_id, uint8_t time)
 	}
 #endif
 
-#pragma GCC diagnostic pop
-
-	sei();
+	SREG = sreg;
 #if !defined(MASTER_CONFIG_H)
 	TIMSK2 |= (1 << OCIE2A); // enable interupt again
 #endif
@@ -743,32 +786,31 @@ ISR(TIMER2_COMP_vect)
 			}
 		}
 	}
-	uint8_t dif = 255;
-	uint8_t i, next;  // next is uninitialized, it is correct
-	for (i = 0; i < RTC_TIMERS; i++)
-	{
-		if ((RTC_timer_todo & (2 << i)))
-		{
-			if ((RTC_timer_time[i] - t2) <= dif)
-			{
-				next = RTC_timer_time[i];
-				dif = next - t2;
-			}
-		}
-	}
-// Ignore maybe ununitialized for next, following above comment
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-	if (OCR2A != next)
-	{
-		// while (ASSR & (1<<OCR2UB)) {;} // ATmega169 datasheet chapter 17.8.1
-		// waiting is not needed, it not allow timer state machine
-		OCR2A = next;
-	}
-#pragma GCC diagnostic pop
 	if (RTC_timer_todo == 0)
 	{
 		TIMSK2 &= ~(1 << OCIE2A);
+	}
+	else
+	{
+		uint8_t dif = 255;
+		uint8_t i;
+		uint8_t next = t2;
+		for (i = 0; i < RTC_TIMERS; i++)
+		{
+			if ((RTC_timer_todo & (2 << i)))
+			{
+				if ((RTC_timer_time[i] - t2) <= dif)
+				{
+					next = RTC_timer_time[i];
+					dif = next - t2;
+				}
+			}
+		}
+		if (OCR2A != next)
+		{
+			// while (ASSR & (1<<OCR2UB)) {;} // waiting blocks timer state machine
+			OCR2A = next;
+		}
 	}
 }
 #else
@@ -802,25 +844,23 @@ ISR(TIMER1_COMPA_vect)
 				task |= TASK_TIMER; // increment second and check Dow_Timer
 			}
 		}
-		uint8_t dif = 255;
-		uint8_t next;
-		for (i = 0; i < RTC_TIMERS; i++)
+		if (RTC_timer_todo != 0)
 		{
-			if ((RTC_timer_todo & (2 << i)))
+			uint8_t dif = 255;
+			uint8_t next = RTC_s100;
+			for (i = 0; i < RTC_TIMERS; i++)
 			{
-				if ((RTC_timer_time[i] - RTC_s100) < dif)
+				if ((RTC_timer_todo & (2 << i)))
 				{
-					next = RTC_timer_time[i];
-					dif = next - RTC_s100;
+					if ((RTC_timer_time[i] - RTC_s100) < dif)
+					{
+						next = RTC_timer_time[i];
+						dif = next - RTC_s100;
+					}
 				}
 			}
+			RTC_next_compare = next;
 		}
-		// cppcheck-suppress uninitvar
-// Ignore maybe ununitialized for next, following above comment
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-		RTC_next_compare = next;
-#pragma GCC diagnostic pop
 	}
 }
 #endif

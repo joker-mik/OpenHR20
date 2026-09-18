@@ -79,6 +79,9 @@ static void wirelessSendPacket(void);
 static void wirelessSendPacket(bool cpy);
 #endif
 
+extern void cmac_left_roll(uint8_t *dst, const uint8_t *src);
+
+
 
 /*!
  *******************************************************************************
@@ -102,41 +105,13 @@ void crypto_init(void)
 		K1[i] = 0;
 	}
 	xtea_enc(K1, K1, K_mac);
-	asm (
-		"   movw  R30,%A0   \n"
-		"   rcall left_roll \n" /* generate K1 */
-		"   ldi r30,lo8(" STR(K2) ") \n"
-		"   ldi r31,hi8(" STR(K2) ") \n"
-		"   rcall left_roll \n" /* generate K2 */
-		:: "y" (K1)
-		: "r26", "r27", "r30", "r31"
-	);
+	cmac_left_roll(K1, K1);   /* generate K1 */
+	cmac_left_roll(K2, K1);   /* generate K2 */
 #if defined(MASTER_CONFIG_H)
 	LED_RX_off();
 	LED_sync_off();
 #endif
 }
-/* internal function for crypto_init */
-/* use loop inside - short/slow */
-asm (
-	"left_roll:               \n"
-	"   ldd r26,Y+7           \n"
-	"   lsl r26               \n"
-	"   in r27,__SREG__       \n"   // save carry
-	"   ldi r26,7             \n"   // 8 times
-	"roll_loop:               \n"
-	"   ld __tmp_reg__,Y      \n"
-	"   out __SREG__,r27      \n"   // restore carry
-	"   rol __tmp_reg__       \n"
-	"   in r27,__SREG__       \n"   // save carry
-	"   st Z,__tmp_reg__      \n"
-	"   adiw r28,1            \n"   // Y++
-	"   adiw r30,1            \n"   // Z++
-	"   subi r26,1            \n"
-	"   brcc roll_loop        \n"   // 8 times loop
-	"   sbiw r28,8            \n"   // Y-=8
-	"   ret "
-);
 
 /*!
  *******************************************************************************
@@ -163,6 +138,12 @@ static void encrypt_decrypt(uint8_t *p, uint8_t len)
 		} while ((i & 7) != 0);
 	}
 }
+static __attribute__((noinline)) void wireless_fifo_reset(void)
+{
+	RFM_FIFO_OFF();
+	RFM_FIFO_ON();
+}
+
 
 /*!
  *******************************************************************************
@@ -177,8 +158,7 @@ void wirelessSendDone(void)
 #endif
 	rfm_framepos = 0;
 
-	RFM_FIFO_OFF();
-	RFM_FIFO_ON();
+	wireless_fifo_reset();
 	RFM_RX_ON();    //re-enable RX
 	rfm_mode = rfmmode_rx;
 	RFM_INT_EN();   // enable RFM interrupt
@@ -211,8 +191,7 @@ void wirelessTimer(void)
 		RFM_INT_DIS();
 		wl_force_addr1 = 0;
 		wl_force_addr2 = 0;
-		RFM_FIFO_OFF();
-		RFM_FIFO_ON();
+		wireless_fifo_reset();
 		RFM_RX_ON();
 		RFM_SPI_SELECT; // set nSEL low: from this moment SDO indicate FFIT or RGIT
 		RFM_INT_EN();   // enable RFM interrupt
@@ -458,9 +437,10 @@ void wirelessReceivePacket(void)
 				else
 #endif
 				{
-					RTC.pkt_cnt += (rfm_framepos + 7 - 2 - 4) / 8;
+					uint8_t pkt_blocks = (rfm_framepos + 1) / 8;
+					RTC.pkt_cnt += pkt_blocks;
 					mac_ok = cmac_calc(rfm_framebuf + 1, rfm_framepos - 1 - 4, (uint8_t *)&RTC, true);
-					RTC.pkt_cnt -= (rfm_framepos + 7 - 2 - 4) / 8;
+					RTC.pkt_cnt -= pkt_blocks;
 					encrypt_decrypt(rfm_framebuf + 2, rfm_framepos - 2 - 4);
 					RTC.pkt_cnt++;
 					COM_dump_packet(rfm_framebuf, rfm_framepos, mac_ok);
@@ -515,8 +495,7 @@ void wirelessReceivePacket(void)
 			}
 			rfm_framepos = 0;
 			rfm_mode = rfmmode_rx;
-			RFM_FIFO_OFF();
-			RFM_FIFO_ON();
+			wireless_fifo_reset();
 			RFM_INT_EN(); // enable RFM interrupt
 		}
 	}
@@ -536,8 +515,7 @@ void wirelesTimeSyncCheck(void)
 		{
 			time_sync_tmo = 0;
 			RFM_INT_DIS();
-			RFM_FIFO_OFF();
-			RFM_FIFO_ON();
+			wireless_fifo_reset();
 			RFM_RX_ON(); //re-enable RX
 			rfm_framepos = 0;
 			rfm_mode = rfmmode_rx;

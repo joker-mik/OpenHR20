@@ -48,6 +48,31 @@ uint8_t rfm_framesize = 6;
 uint8_t rfm_framepos = 0;
 rfm_mode_t rfm_mode = rfmmode_stop;
 
+#if RFM_RUNTIME_DETECT
+uint8_t rfm_available = 0;
+
+/* Detect an optional RFM12 before enabling its interrupt path. */
+uint8_t RFM_detect(void)
+{
+	uint8_t present;
+
+	RFM_INT_DIS();
+	RFM_SPI_DESELECT;
+	RFM_SDO_DDR &= ~_BV(RFM_SDO_BITPOS);
+	RFM_SDO_PORT |= _BV(RFM_SDO_BITPOS);
+
+	present = (RFM_READ_STATUS() != 0xffff);
+	if (!present)
+	{
+		present = (RFM_READ_STATUS() != 0xffff);
+	}
+
+	RFM_SDO_PORT &= ~_BV(RFM_SDO_BITPOS);
+	RFM_SPI_DESELECT;
+	return present;
+}
+#endif
+
 /*!
  *******************************************************************************
  *  RFM SPI access
