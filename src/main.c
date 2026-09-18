@@ -561,7 +561,18 @@ static inline void init(void)
 
 #if RFM
 #if RFM_RUNTIME_DETECT
-	rfm_available = RFM_detect();
+	switch (config.RFM_mode)
+	{
+	case RFM_MODE_OFF:
+		rfm_available = 0;
+		break;
+	case RFM_MODE_ON:
+		rfm_available = 1;
+		break;
+	default:
+		rfm_available = RFM_detect();
+		break;
+	}
 #endif
 	if (rfm_available)
 	{
