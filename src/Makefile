@@ -322,6 +322,10 @@ CFLAGS += -Wl,--relax
 #CFLAGS += --param inline-call-cost=2
 #CFLAGS += -ffunction-sections
 CFLAGS += -fdata-sections
+GC_SECTIONS?=0
+ifeq ($(GC_SECTIONS),1)
+CFLAGS += -ffunction-sections
+endif
 CFLAGS += -fno-toplevel-reorder
 
 ifeq ($(HW),THERMOTRONIC)
@@ -401,6 +405,9 @@ LDFLAGS = -Wl,-Map=$(TARGET).map,--cref
 LDFLAGS += $(EXTMEMOPTS)
 LDFLAGS += $(patsubst %,-L%,$(EXTRALIBDIRS))
 LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
+ifeq ($(GC_SECTIONS),1)
+LDFLAGS += -Wl,--gc-sections
+endif
 #LDFLAGS += -T linker_script.x
 #LDFLAGS += --relax
 #LDFLAGS += --combine -fwhole-program
