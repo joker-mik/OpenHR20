@@ -138,6 +138,11 @@ static void encrypt_decrypt(uint8_t *p, uint8_t len)
 		} while ((i & 7) != 0);
 	}
 }
+static __attribute__((noinline)) void wireless_fifo_reset(void)
+{
+	wireless_fifo_reset();
+}
+
 
 /*!
  *******************************************************************************
@@ -152,8 +157,7 @@ void wirelessSendDone(void)
 #endif
 	rfm_framepos = 0;
 
-	RFM_FIFO_OFF();
-	RFM_FIFO_ON();
+	wireless_fifo_reset();
 	RFM_RX_ON();    //re-enable RX
 	rfm_mode = rfmmode_rx;
 	RFM_INT_EN();   // enable RFM interrupt
@@ -186,8 +190,7 @@ void wirelessTimer(void)
 		RFM_INT_DIS();
 		wl_force_addr1 = 0;
 		wl_force_addr2 = 0;
-		RFM_FIFO_OFF();
-		RFM_FIFO_ON();
+		wireless_fifo_reset();
 		RFM_RX_ON();
 		RFM_SPI_SELECT; // set nSEL low: from this moment SDO indicate FFIT or RGIT
 		RFM_INT_EN();   // enable RFM interrupt
@@ -491,8 +494,7 @@ void wirelessReceivePacket(void)
 			}
 			rfm_framepos = 0;
 			rfm_mode = rfmmode_rx;
-			RFM_FIFO_OFF();
-			RFM_FIFO_ON();
+			wireless_fifo_reset();
 			RFM_INT_EN(); // enable RFM interrupt
 		}
 	}
@@ -512,8 +514,7 @@ void wirelesTimeSyncCheck(void)
 		{
 			time_sync_tmo = 0;
 			RFM_INT_DIS();
-			RFM_FIFO_OFF();
-			RFM_FIFO_ON();
+			wireless_fifo_reset();
 			RFM_RX_ON(); //re-enable RX
 			rfm_framepos = 0;
 			rfm_mode = rfmmode_rx;
