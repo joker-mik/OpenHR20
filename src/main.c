@@ -220,7 +220,7 @@ int __attribute__ ((noreturn)) main(void)
 
 #if RFM
 		// RFM12
-		if (task & TASK_RFM)
+		if (rfm_available && (task & TASK_RFM))
 		{
 			task &= ~TASK_RFM;
 
@@ -337,14 +337,14 @@ int __attribute__ ((noreturn)) main(void)
 					}
 #endif
 #if RFM
-					wirelesTimeSyncCheck();
+					if (rfm_available) wirelesTimeSyncCheck();
 #endif
 #if MOTOR_AUTO_RESYNC
 					motor_resync_update();
 #endif
 				}
 #if RFM
-				if ((config.RFM_devaddr != 0) && (time_sync_tmo > 1))
+				if (rfm_available && (config.RFM_devaddr != 0) && (time_sync_tmo > 1))
 				{
 					if (((RTC_GetSecond() == config.RFM_devaddr) && (wireless_buf_ptr)) ||
 					    (
@@ -399,7 +399,7 @@ int __attribute__ ((noreturn)) main(void)
 				display_task |= DISP_TASK_UPDATE;
 			}
 #if RFM
-			if (RTC_timer_done & _BV(RTC_TIMER_RFM))
+			if (rfm_available && (RTC_timer_done & _BV(RTC_TIMER_RFM)))
 			{
 				cli(); RTC_timer_done &= ~_BV(RTC_TIMER_RFM); sei();
 				wirelessTimer();
