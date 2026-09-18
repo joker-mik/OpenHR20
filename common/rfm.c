@@ -68,6 +68,7 @@ uint8_t RFM_detect(void)
 	}
 
 	RFM_SDO_PORT &= ~_BV(RFM_SDO_BITPOS);
+	RFM_SPI_DESELECT;
 	return present;
 }
 #endif
