@@ -325,10 +325,15 @@ CFLAGS += -Wl,--relax
 #CFLAGS += -ffunction-sections
 CFLAGS += -fdata-sections
 GC_SECTIONS?=0
+LTO?=0
 ifeq ($(GC_SECTIONS),1)
 CFLAGS += -ffunction-sections
 endif
+ifeq ($(LTO),1)
+CFLAGS += -flto
+else
 CFLAGS += -fno-toplevel-reorder
+endif
 
 ifeq ($(HW),THERMOTRONIC)
     CFLAGS += -DTHERMOTRONIC=1
@@ -409,6 +414,9 @@ LDFLAGS += $(patsubst %,-L%,$(EXTRALIBDIRS))
 LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
 ifeq ($(GC_SECTIONS),1)
 LDFLAGS += -Wl,--gc-sections
+endif
+ifeq ($(LTO),1)
+LDFLAGS += -flto
 endif
 #LDFLAGS += -T linker_script.x
 #LDFLAGS += --relax
