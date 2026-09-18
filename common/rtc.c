@@ -534,10 +534,7 @@ static void RTC_AddOneDay(void)
 		RTC_DS = 0;
 	}
 	// next day of week
-	if (++RTC.DOW > 7)
-	{
-		RTC.DOW = 1;
-	}
+	RTC.DOW = (RTC.DOW % 7) + 1; // Monday = 1 Sat=7
 #if !defined(MASTER_CONFIG_H)
 	// update hourbar
 	menu_update_hourbar((config.timer_mode == 1) ? RTC.DOW : 0);
@@ -643,12 +640,8 @@ static void RTC_SetDayOfWeek(void)
 add_month_day:
 	tmp_dow += pgm_read_byte(&RTC_MonthOffsetTablePrgMem[RTC.MM - 1]) + RTC.DD;
 
-	// Reduce modulo 7 without pulling in a general division path.
-	while (tmp_dow >= 7U)
-	{
-		tmp_dow -= 7U;
-	}
-	RTC.DOW = (uint8_t)tmp_dow;
+	// Formula returns 0=Sunday, 1=Monday, ... 6=Saturday.
+	RTC.DOW = (uint8_t)(tmp_dow % 7U);
 	if (RTC.DOW == 0)
 	{
 		RTC.DOW = 7;
