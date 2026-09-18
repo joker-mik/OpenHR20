@@ -814,6 +814,8 @@ void menu_view(bool clear)
 		}
 	// do not use break at this position / optimization
 	case menu_home_no_alter: // wanted temp
+	{
+		bool auto_matches = CTL_test_auto();
 		if (clear)
 		{
 			if (CTL_mode_auto)
@@ -840,7 +842,7 @@ void menu_view(bool clear)
 		// rather than the LCD frame blink mode, so the LCD frame interrupt can sleep.
 		if (CTL_mode_auto)
 		{
-			if ((CTL_temp_auto_type != TEMP_TYPE_INVALID) && !CTL_test_auto())
+			if ((CTL_temp_auto_type != TEMP_TYPE_INVALID) && !auto_matches)
 			{
 				LCD_SetSeg(LCD_SEG_AUTO, (RTC_GetSecond() & 1) ? LCD_MODE_OFF : LCD_MODE_ON);
 			}
@@ -856,7 +858,7 @@ void menu_view(bool clear)
 
 		// Preset symbols identify the active schedule temperature only while the
 		// current target still matches that schedule. They stay off during override.
-		if (CTL_test_auto())
+		if (auto_matches)
 		{
 			show_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_ON);
 		}
@@ -865,6 +867,7 @@ void menu_view(bool clear)
 			show_selected_temperature_type(CTL_temp_auto_type, LCD_MODE_OFF);
 		}
 		LCD_PrintTemp(CTL_temp_wanted, LCD_MODE_ON);
+	}
 		break;
 	case menu_home2: // real temperature
 		if (clear)
