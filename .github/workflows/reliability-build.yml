@@ -56,6 +56,335 @@ jobs:
       - name: Build standalone HR25
         run: make HR25_original_sww REV=${GITHUB_SHA::8}
 
+      - name: Build universal HR25 TK_INTERNAL
+        run: make HR25_universal_tk REV=${GITHUB_SHA::8}
+
+      - name: Verify universal HR25 feature profile
+        run: |
+          grep -q '^RFM=1
+      - name: Build remaining thermostat and radio targets
+        run: |
+          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
+          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
+          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
+          make HR20_original_hww REV=${GITHUB_SHA::8}
+          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
+          make thermotronic_sww REV=${GITHUB_SHA::8}
+          make rfm_master REV=${GITHUB_SHA::8}
+
+      - name: Static checks
+        run: |
+          make check
+          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
+
+      - name: Verify EEPROM layout
+        run: |
+          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf
+
+      - name: Show build metadata
+        run: |
+          cat bin/HR20_universal_jd/hr20.txt
+          cat bin/HR20_original_sww/hr20.txt
+          cat bin/HR25_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR25_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR25_original_sww/hr20.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermostat-firmware-${{ github.sha }}
+          path: |
+            bin/HR20_universal_jd/hr20.hex
+            bin/HR20_universal_jd/hr20.eep
+            bin/HR20_universal_jd/hr20.elf
+            bin/HR20_universal_jd/hr20.map
+            bin/HR20_universal_jd/hr20.txt
+            bin/HR20_original_sww/hr20.hex
+            bin/HR20_original_sww/hr20.eep
+            bin/HR20_original_sww/hr20.elf
+            bin/HR20_original_sww/hr20.map
+            bin/HR20_original_sww/hr20.txt
+            bin/HR25_original_sww/hr20.hex
+            bin/HR25_original_sww/hr20.eep
+            bin/HR25_original_sww/hr20.elf
+            bin/HR25_original_sww/hr20.map
+            bin/HR25_original_sww/hr20.txt
+ bin/HR25_universal_tk/hr20.txt
+          grep -q '^RFM_TUNING=1
+      - name: Build remaining thermostat and radio targets
+        run: |
+          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
+          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
+          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
+          make HR20_original_hww REV=${GITHUB_SHA::8}
+          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
+          make thermotronic_sww REV=${GITHUB_SHA::8}
+          make rfm_master REV=${GITHUB_SHA::8}
+
+      - name: Static checks
+        run: |
+          make check
+          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
+
+      - name: Verify EEPROM layout
+        run: |
+          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf
+
+      - name: Show build metadata
+        run: |
+          cat bin/HR20_universal_jd/hr20.txt
+          cat bin/HR20_original_sww/hr20.txt
+          cat bin/HR25_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR25_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR25_original_sww/hr20.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermostat-firmware-${{ github.sha }}
+          path: |
+            bin/HR20_universal_jd/hr20.hex
+            bin/HR20_universal_jd/hr20.eep
+            bin/HR20_universal_jd/hr20.elf
+            bin/HR20_universal_jd/hr20.map
+            bin/HR20_universal_jd/hr20.txt
+            bin/HR20_original_sww/hr20.hex
+            bin/HR20_original_sww/hr20.eep
+            bin/HR20_original_sww/hr20.elf
+            bin/HR20_original_sww/hr20.map
+            bin/HR20_original_sww/hr20.txt
+            bin/HR25_original_sww/hr20.hex
+            bin/HR25_original_sww/hr20.eep
+            bin/HR25_original_sww/hr20.elf
+            bin/HR25_original_sww/hr20.map
+            bin/HR25_original_sww/hr20.txt
+ bin/HR25_universal_tk/hr20.txt
+          grep -q '^RFM_RUNTIME_DETECT=1
+      - name: Build remaining thermostat and radio targets
+        run: |
+          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
+          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
+          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
+          make HR20_original_hww REV=${GITHUB_SHA::8}
+          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
+          make thermotronic_sww REV=${GITHUB_SHA::8}
+          make rfm_master REV=${GITHUB_SHA::8}
+
+      - name: Static checks
+        run: |
+          make check
+          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
+
+      - name: Verify EEPROM layout
+        run: |
+          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf
+
+      - name: Show build metadata
+        run: |
+          cat bin/HR20_universal_jd/hr20.txt
+          cat bin/HR20_original_sww/hr20.txt
+          cat bin/HR25_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR25_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR25_original_sww/hr20.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermostat-firmware-${{ github.sha }}
+          path: |
+            bin/HR20_universal_jd/hr20.hex
+            bin/HR20_universal_jd/hr20.eep
+            bin/HR20_universal_jd/hr20.elf
+            bin/HR20_universal_jd/hr20.map
+            bin/HR20_universal_jd/hr20.txt
+            bin/HR20_original_sww/hr20.hex
+            bin/HR20_original_sww/hr20.eep
+            bin/HR20_original_sww/hr20.elf
+            bin/HR20_original_sww/hr20.map
+            bin/HR20_original_sww/hr20.txt
+            bin/HR25_original_sww/hr20.hex
+            bin/HR25_original_sww/hr20.eep
+            bin/HR25_original_sww/hr20.elf
+            bin/HR25_original_sww/hr20.map
+            bin/HR25_original_sww/hr20.txt
+ bin/HR25_universal_tk/hr20.txt
+          grep -q '^REMOTE_SETTING_ONLY=0
+      - name: Build remaining thermostat and radio targets
+        run: |
+          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
+          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
+          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
+          make HR20_original_hww REV=${GITHUB_SHA::8}
+          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
+          make thermotronic_sww REV=${GITHUB_SHA::8}
+          make rfm_master REV=${GITHUB_SHA::8}
+
+      - name: Static checks
+        run: |
+          make check
+          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
+
+      - name: Verify EEPROM layout
+        run: |
+          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf
+
+      - name: Show build metadata
+        run: |
+          cat bin/HR20_universal_jd/hr20.txt
+          cat bin/HR20_original_sww/hr20.txt
+          cat bin/HR25_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR25_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR25_original_sww/hr20.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermostat-firmware-${{ github.sha }}
+          path: |
+            bin/HR20_universal_jd/hr20.hex
+            bin/HR20_universal_jd/hr20.eep
+            bin/HR20_universal_jd/hr20.elf
+            bin/HR20_universal_jd/hr20.map
+            bin/HR20_universal_jd/hr20.txt
+            bin/HR20_original_sww/hr20.hex
+            bin/HR20_original_sww/hr20.eep
+            bin/HR20_original_sww/hr20.elf
+            bin/HR20_original_sww/hr20.map
+            bin/HR20_original_sww/hr20.txt
+            bin/HR25_original_sww/hr20.hex
+            bin/HR25_original_sww/hr20.eep
+            bin/HR25_original_sww/hr20.elf
+            bin/HR25_original_sww/hr20.map
+            bin/HR25_original_sww/hr20.txt
+ bin/HR25_universal_tk/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1
+      - name: Build remaining thermostat and radio targets
+        run: |
+          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
+          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
+          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
+          make HR20_original_hww REV=${GITHUB_SHA::8}
+          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
+          make thermotronic_sww REV=${GITHUB_SHA::8}
+          make rfm_master REV=${GITHUB_SHA::8}
+
+      - name: Static checks
+        run: |
+          make check
+          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
+
+      - name: Verify EEPROM layout
+        run: |
+          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf
+
+      - name: Show build metadata
+        run: |
+          cat bin/HR20_universal_jd/hr20.txt
+          cat bin/HR20_original_sww/hr20.txt
+          cat bin/HR25_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR25_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR25_original_sww/hr20.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermostat-firmware-${{ github.sha }}
+          path: |
+            bin/HR20_universal_jd/hr20.hex
+            bin/HR20_universal_jd/hr20.eep
+            bin/HR20_universal_jd/hr20.elf
+            bin/HR20_universal_jd/hr20.map
+            bin/HR20_universal_jd/hr20.txt
+            bin/HR20_original_sww/hr20.hex
+            bin/HR20_original_sww/hr20.eep
+            bin/HR20_original_sww/hr20.elf
+            bin/HR20_original_sww/hr20.map
+            bin/HR20_original_sww/hr20.txt
+            bin/HR25_original_sww/hr20.hex
+            bin/HR25_original_sww/hr20.eep
+            bin/HR25_original_sww/hr20.elf
+            bin/HR25_original_sww/hr20.map
+            bin/HR25_original_sww/hr20.txt
+ bin/HR25_universal_tk/hr20.txt
+          grep -q '^DISABLE_JTAG=1
+      - name: Build remaining thermostat and radio targets
+        run: |
+          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
+          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
+          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
+          make HR20_original_hww REV=${GITHUB_SHA::8}
+          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
+          make thermotronic_sww REV=${GITHUB_SHA::8}
+          make rfm_master REV=${GITHUB_SHA::8}
+
+      - name: Static checks
+        run: |
+          make check
+          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
+
+      - name: Verify EEPROM layout
+        run: |
+          bash tools/check_eeprom_layout.sh bin/HR20_original_sww/hr20.elf
+          bash tools/check_eeprom_layout.sh bin/HR25_original_sww/hr20.elf
+
+      - name: Show build metadata
+        run: |
+          cat bin/HR20_universal_jd/hr20.txt
+          cat bin/HR20_original_sww/hr20.txt
+          cat bin/HR25_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR25_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR20_original_sww/hr20.txt
+          grep -q '^MOTOR_AUTO_RESYNC=1$' bin/HR25_original_sww/hr20.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermostat-firmware-${{ github.sha }}
+          path: |
+            bin/HR20_universal_jd/hr20.hex
+            bin/HR20_universal_jd/hr20.eep
+            bin/HR20_universal_jd/hr20.elf
+            bin/HR20_universal_jd/hr20.map
+            bin/HR20_universal_jd/hr20.txt
+            bin/HR20_original_sww/hr20.hex
+            bin/HR20_original_sww/hr20.eep
+            bin/HR20_original_sww/hr20.elf
+            bin/HR20_original_sww/hr20.map
+            bin/HR20_original_sww/hr20.txt
+            bin/HR25_original_sww/hr20.hex
+            bin/HR25_original_sww/hr20.eep
+            bin/HR25_original_sww/hr20.elf
+            bin/HR25_original_sww/hr20.map
+            bin/HR25_original_sww/hr20.txt
+ bin/HR25_universal_tk/hr20.txt
+
+      - name: Enforce universal HR25 memory limits
+        run: |
+          PROGRAM_BYTES=$(awk '/Program:/ {print $2}' bin/HR25_universal_tk/hr20.txt | tail -n1)
+          DATA_BYTES=$(awk '/Data:/ {print $2}' bin/HR25_universal_tk/hr20.txt | tail -n1)
+          echo "Universal HR25 flash: ${PROGRAM_BYTES}/32768 bytes"
+          echo "Universal HR25 SRAM:  ${DATA_BYTES}/2048 bytes"
+          test -n "$PROGRAM_BYTES"
+          test -n "$DATA_BYTES"
+          test "$PROGRAM_BYTES" -le 32768
+          test "$DATA_BYTES" -le 2048
+
       - name: Build remaining thermostat and radio targets
         run: |
           make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
