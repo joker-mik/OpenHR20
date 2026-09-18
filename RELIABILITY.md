@@ -1,10 +1,10 @@
-# Standalone HR20 reliability profile
+# Thermostat reliability profile
 
-This fork carries a conservative reliability profile for a plain Honeywell HR20 without RFM radio.
+This fork carries reliability improvements across the supported thermostat targets. A plain Honeywell HR20 without RFM remains the default build, but the runtime hardening is not limited to that configuration.
 
 ## Defaults
 
-- plain HR20 / `RFM=0` is the default build;
+- plain HR20 / `RFM=0` is the default build, while CI also compiles the supported RFM, HR25 and Thermotronic targets;
 - UART is enabled automatically for non-RFM HR20 builds;
 - the existing PID/controller and software window detection algorithms are unchanged;
 - the existing AUTO display behaviour and battery status page are retained.
