@@ -77,9 +77,29 @@ static uint8_t RTC_DaysOfMonth(void);           // how many days in (RTC_MM, RTC
 static void    RTC_SetDayOfWeek(void);          // calc day of week (RTC_DD, RTC_MM, RTC_YY)
 static bool    RTC_IsLastSunday(void);          // check actual date if last sun in mar/oct
 
-// year mod 100 = 0 is only every 400 years a leap year
-// we calculate only till the year 2255, so don't care
-#define RTC_NoLeapyear() (RTC.YY % 4)
+/*
+ * Gregorian leap-year rules:
+ *  - years divisible by 4 are leap years,
+ *  - except years divisible by 100,
+ *  - unless they are also divisible by 400.
+ *
+ * RTC.YY stores the offset from 2000 (0..255 => 2000..2255), therefore
+ * the full calendar year must be used for the century rules.
+ */
+static bool RTC_IsLeapYear(void)
+{
+	uint16_t year = 2000U + (uint16_t)RTC.YY;
+
+	if ((year % 4U) != 0U)
+	{
+		return false;
+	}
+	if ((year % 100U) != 0U)
+	{
+		return true;
+	}
+	return (year % 400U) == 0U;
+}
 
 // Progmem constants
 
@@ -522,7 +542,7 @@ static uint8_t RTC_DaysOfMonth()
 {
 	uint8_t dom = pgm_read_byte(&RTC_DayOfMonthTablePrgMem[RTC.MM - 1]);
 
-	if ((RTC.MM == 2) && (!RTC_NoLeapyear()))
+	if ((RTC.MM == 2) && RTC_IsLeapYear())
 	{
 		return 29; // leapyear feb=29
 	}
@@ -570,39 +590,38 @@ static bool RTC_IsLastSunday(void)
  *  \return 1=monday to 7=sunday
  *
  ******************************************************************************/
-static const uint16_t daysInYear [12] PROGMEM = {
-	0,
-	31,
-	31 + 28,
-	31 + 28 + 31,
-	31 + 28 + 31 + 30,
-	31 + 28 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30
+static const uint8_t RTC_MonthOffsetTablePrgMem[12] PROGMEM = {
+	0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4
 };
 
 static void RTC_SetDayOfWeek(void)
 {
-	uint16_t day_of_year;
+	uint16_t year = 2000U + (uint16_t)RTC.YY;
 	uint16_t tmp_dow;
 
-	// Day of year
-	day_of_year = pgm_read_word(&(daysInYear[RTC.MM - 1])) + RTC.DD;
-	if (RTC.MM > 2)   // february
+	/*
+	 * Gregorian weekday calculation. January and February are treated as
+	 * months of the previous year so the /4, /100 and /400 corrections
+	 * apply at the correct boundary, including 2000, 2100 and 2200.
+	 */
+	if (RTC.MM < 3)
 	{
-		if (!RTC_NoLeapyear())
-		{
-			day_of_year++;
-		}
+		year--;
 	}
-	// calc weekday
-	tmp_dow = RTC.YY + ((RTC.YY - 1) / 4) - ((RTC.YY - 1) / 100) + day_of_year;
-	// set DOW
-	RTC.DOW = (uint8_t)((tmp_dow + 5) % 7) + 1;
+
+	tmp_dow = year
+	          + (year / 4U)
+	          - (year / 100U)
+	          + (year / 400U)
+	          + pgm_read_byte(&RTC_MonthOffsetTablePrgMem[RTC.MM - 1])
+	          + RTC.DD;
+
+	// Formula returns 0=Sunday, 1=Monday, ... 6=Saturday.
+	RTC.DOW = (uint8_t)(tmp_dow % 7U);
+	if (RTC.DOW == 0)
+	{
+		RTC.DOW = 7;
+	}
 
 #if !defined(MASTER_CONFIG_H)
 	menu_update_hourbar((config.timer_mode == 1) ? RTC.DOW : 0);
