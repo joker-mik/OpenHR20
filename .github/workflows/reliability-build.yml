@@ -35,6 +35,11 @@ jobs:
         run: |
           avr-nm --print-size --size-sort --radix=d bin/HR20_universal_jd/hr20.elf | tail -n 50
 
+      - name: Trace universal 32-bit division helper
+        run: |
+          avr-objdump -d bin/HR20_universal_jd/hr20.elf | grep -B 8 -A 4 "__udivmodsi4" || true
+          grep -n -A 8 -B 8 "__udivmodsi4" bin/HR20_universal_jd/hr20.map || true
+
       - name: Enforce universal HR20 memory limits
         run: |
           PROGRAM_BYTES=$(awk '/Program:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
