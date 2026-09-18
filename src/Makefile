@@ -326,15 +326,11 @@ CFLAGS += -Wl,--relax
 CFLAGS += -fdata-sections
 GC_SECTIONS?=0
 LTO?=0
-LTO_SIZE_OPT?=0
 ifeq ($(GC_SECTIONS),1)
 CFLAGS += -ffunction-sections
 endif
 ifeq ($(LTO),1)
 CFLAGS += -flto
-ifeq ($(LTO_SIZE_OPT),1)
-CFLAGS += -fno-inline-small-functions -fno-inline-functions-called-once
-endif
 else
 CFLAGS += -fno-toplevel-reorder
 endif
