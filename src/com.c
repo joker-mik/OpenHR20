@@ -305,6 +305,10 @@ static void print_version(bool sync)
  *
  *  \note
  ******************************************************************************/
+#if RFM == 1
+static void COM_wireless_word(uint16_t w);
+#endif
+
 void COM_init(void)
 {
 #ifdef COM_UART
@@ -407,10 +411,8 @@ void COM_print_debug(uint8_t type)
 		| ((mode_window()) ? 0x40 : 0)
 		| ((menu_locked) ? 0x80 : 0));
 	wireless_putchar(CTL_error);
-	wireless_putchar(temp_average >> 8);    // current temp
-	wireless_putchar(temp_average & 0xff);
-	wireless_putchar(bat_average >> 8);     // current temp
-	wireless_putchar(bat_average & 0xff);
+	COM_wireless_word((uint16_t)temp_average);
+	COM_wireless_word(bat_average);
 	wireless_putchar(CTL_temp_wanted);      // wanted temp
 	wireless_putchar(valve_wanted);         // valve pos
 	wireless_async = false;
