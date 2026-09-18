@@ -714,12 +714,24 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			COM_print_debug(2);
 			break;
 		case 'T':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			wireless_putchar(rfm_framebuf[pos]);
 			COM_wireless_word(watch(rfm_framebuf[pos]));
 			pos++;
 			break;
 		case 'G':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 		case 'S':
+			if ((uint8_t)(rfm_framepos - pos) < 2)
+			{
+				return;
+			}
 			if (c == 'S')
 			{
 				if (rfm_framebuf[pos] < CONFIG_RAW_SIZE)
@@ -748,7 +760,15 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			pos++;
 			break;
 		case 'R':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 		case 'W':
+			if ((uint8_t)(rfm_framepos - pos) < 3)
+			{
+				return;
+			}
 			if (c == 'W')
 			{
 				RTC_DowTimerSet(
@@ -768,6 +788,10 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			pos++;
 			break;
 		case 'B':
+			if ((uint8_t)(rfm_framepos - pos) < 2)
+			{
+				return;
+			}
 			if ((rfm_framebuf[pos] == 0x13) && (rfm_framebuf[pos + 1] == 0x24))
 			{
 				reboot = true;
@@ -777,10 +801,18 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			pos += 2;
 			break;
 		case 'M':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			CTL_change_mode(rfm_framebuf[pos++]);
 			COM_print_debug(2);
 			break;
 		case 'A':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			if (rfm_framebuf[pos] < TEMP_MIN - 1)
 			{
 				break;
@@ -793,6 +825,10 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			COM_print_debug(2);
 			break;
 		case 'L':
+			if ((uint8_t)(rfm_framepos - pos) < 1)
+			{
+				return;
+			}
 			if (rfm_framebuf[pos] <= 1)
 			{
 				menu_locked = rfm_framebuf[pos];
