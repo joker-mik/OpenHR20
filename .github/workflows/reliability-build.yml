@@ -31,8 +31,20 @@ jobs:
       - name: Build standalone HR25
         run: make HR25_original_sww REV=${GITHUB_SHA::8}
 
+      - name: Build remaining thermostat and radio targets
+        run: |
+          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
+          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
+          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
+          make HR20_original_hww REV=${GITHUB_SHA::8}
+          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
+          make thermotronic_sww REV=${GITHUB_SHA::8}
+          make rfm_master REV=${GITHUB_SHA::8}
+
       - name: Static checks
-        run: make check
+        run: |
+          make check
+          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
 
       - name: Verify EEPROM layout
         run: |
