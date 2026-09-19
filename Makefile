@@ -84,6 +84,7 @@ HR20_universal_jd:
 		WINDOW_DETECTION_RUNTIME=1 \
 		GC_SECTIONS=1 \
 		LTO=1 \
+		FLAGS="-fno-inline-small-functions -fno-inline-functions-called-once" \
 		REV=-DREVISION=\\\"$(REV)\\\"
 
 HR20_rfm_int_sww:
