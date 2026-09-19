@@ -182,6 +182,7 @@ RFM_TUNING?=1
 TEMP_COMPENSATE_OPTION?=0
 REMOTE_SETTING_ONLY?=$(RFM)
 RFM_RUNTIME_DETECT?=0
+ENABLE_UART?=0
 HW_WINDOW_DETECTION?=0
 # Standalone HR20/HR25: compile both window algorithms and select at runtime.
 # Radio builds keep compile-time selection because PE2 can conflict with radio wiring.
@@ -263,6 +264,9 @@ CFLAGS += $(CDEFS)
 CFLAGS += $(REV)
 CFLAGS += -DRFM=$(RFM)
 CFLAGS += -DRFM_RUNTIME_DETECT=$(RFM_RUNTIME_DETECT)
+ifeq ($(ENABLE_UART),1)
+CFLAGS += -DCOM_UART=1
+endif
 ifeq ($(RFM),1)
 CFLAGS += -DRFM_BAUD_RATE=$(RFM_BAUD_RATE)
 CFLAGS += -DRFM_DEVICE_ADDRESS=$(RFM_DEVICE_ADDRESS)
@@ -678,6 +682,7 @@ extcoff: $(TARGET).elf
 	@echo "RFM_FREQ_FINE=$(RFM_FREQ_FINE)" >> $@
 	@echo "RFM_TUNING=$(RFM_TUNING)" >> $@
 	@echo "RFM_RUNTIME_DETECT=$(RFM_RUNTIME_DETECT)" >> $@
+	@echo "ENABLE_UART=$(ENABLE_UART)" >> $@
 	@echo "TEMP_COMPENSATE_OPTION=$(TEMP_COMPENSATE_OPTION)" >> $@
 	@echo "REMOTE_SETTING_ONLY=$(REMOTE_SETTING_ONLY)" >> $@
 	@echo "HW_WINDOW_DETECTION=$(HW_WINDOW_DETECTION)" >> $@
