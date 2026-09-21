@@ -35,93 +35,14 @@ jobs:
           grep -q '^RFM_RUNTIME_DETECT=1$' bin/HR20_universal_jd/hr20.txt
           grep -q '^ENABLE_UART=1$' bin/HR20_universal_jd/hr20.txt
           grep -q '^UART_VERBOSE_STATUS=0$' bin/HR20_universal_jd/hr20.txt
-          grep -q '^ENABLE_WATCH_COMMAND=0          grep -q '^REMOTE_SETTING_ONLY=0$' bin/HR20_universal_jd/hr20.txt
-          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_universal_jd/hr20.txt
-
-      - name: Show largest symbols
-        run: avr-nm --print-size --size-sort --radix=d bin/HR20_universal_jd/hr20.elf | tail -n 60
-
-      - name: Enforce ATmega169P memory limits
-        run: |
-          PROGRAM_BYTES=$(awk '/Program:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
-          DATA_BYTES=$(awk '/Data:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
-          echo "Universal HR20 flash: ${PROGRAM_BYTES}/16384 bytes"
-          echo "Universal HR20 SRAM:  ${DATA_BYTES}/1024 bytes"
-          test "$PROGRAM_BYTES" -le 16384
-          test "$DATA_BYTES" -le 1024
-
-      - name: Build regression targets
-        run: |
-          make HR20_original_sww REV=${GITHUB_SHA::8}
-          make HR25_original_sww REV=${GITHUB_SHA::8}
-          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
-          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
-          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
-          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
-          make thermotronic_sww REV=${GITHUB_SHA::8}
-          make rfm_master REV=${GITHUB_SHA::8}
-
-      - name: Static checks
-        run: |
-          make check
-          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
-
-      - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: thermostat-firmware-${{ github.sha }}
-          path: |
-            bin/HR20_universal_jd/hr20.hex
-            bin/HR20_universal_jd/hr20.eep
-            bin/HR20_universal_jd/hr20.elf
-            bin/HR20_universal_jd/hr20.map
-            bin/HR20_universal_jd/hr20.txt
- bin/HR20_universal_jd/hr20.txt
-          grep -q '^DEBUG_MOTOR_COUNTER=0          grep -q '^REMOTE_SETTING_ONLY=0$' bin/HR20_universal_jd/hr20.txt
-          grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_universal_jd/hr20.txt
-
-      - name: Enforce ATmega169P memory limits
-        run: |
-          PROGRAM_BYTES=$(awk '/Program:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
-          DATA_BYTES=$(awk '/Data:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
-          echo "Universal HR20 flash: ${PROGRAM_BYTES}/16384 bytes"
-          echo "Universal HR20 SRAM:  ${DATA_BYTES}/1024 bytes"
-          test "$PROGRAM_BYTES" -le 16384
-          test "$DATA_BYTES" -le 1024
-
-      - name: Show largest symbols
-        run: avr-nm --print-size --size-sort --radix=d bin/HR20_universal_jd/hr20.elf | tail -n 60
-
-      - name: Build regression targets
-        run: |
-          make HR20_original_sww REV=${GITHUB_SHA::8}
-          make HR25_original_sww REV=${GITHUB_SHA::8}
-          make HR20_rfm_int_sww REV=${GITHUB_SHA::8}
-          make HR20_rfm_int_hww REV=${GITHUB_SHA::8}
-          make HR20_rfm_ext_sww REV=${GITHUB_SHA::8}
-          make HR25_rfm_int_sww REV=${GITHUB_SHA::8}
-          make thermotronic_sww REV=${GITHUB_SHA::8}
-          make rfm_master REV=${GITHUB_SHA::8}
-
-      - name: Static checks
-        run: |
-          make check
-          cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
-
-      - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: thermostat-firmware-${{ github.sha }}
-          path: |
-            bin/HR20_universal_jd/hr20.hex
-            bin/HR20_universal_jd/hr20.eep
-            bin/HR20_universal_jd/hr20.elf
-            bin/HR20_universal_jd/hr20.map
-            bin/HR20_universal_jd/hr20.txt
- bin/HR20_universal_jd/hr20.txt
+          grep -q '^ENABLE_WATCH_COMMAND=0$' bin/HR20_universal_jd/hr20.txt
+          grep -q '^DEBUG_MOTOR_COUNTER=0$' bin/HR20_universal_jd/hr20.txt
           grep -q '^REMOTE_SETTING_ONLY=0$' bin/HR20_universal_jd/hr20.txt
           grep -q '^WINDOW_DETECTION_RUNTIME=1$' bin/HR20_universal_jd/hr20.txt
 
+      - name: Show largest symbols
+        run: avr-nm --print-size --size-sort --radix=d bin/HR20_universal_jd/hr20.elf | tail -n 60
+
       - name: Enforce ATmega169P memory limits
         run: |
           PROGRAM_BYTES=$(awk '/Program:/ {print $2}' bin/HR20_universal_jd/hr20.txt | tail -n1)
@@ -130,9 +51,6 @@ jobs:
           echo "Universal HR20 SRAM:  ${DATA_BYTES}/1024 bytes"
           test "$PROGRAM_BYTES" -le 16384
           test "$DATA_BYTES" -le 1024
-
-      - name: Show largest symbols
-        run: avr-nm --print-size --size-sort --radix=d bin/HR20_universal_jd/hr20.elf | tail -n 60
 
       - name: Build regression targets
         run: |
@@ -150,10 +68,10 @@ jobs:
           make check
           cppcheck --inline-suppr --force --error-exitcode=1 --suppress=objectIndex rfm-master >/dev/null
 
-      - name: Upload firmware artifacts
+      - name: Upload universal firmware
         uses: actions/upload-artifact@v4
         with:
-          name: thermostat-firmware-${{ github.sha }}
+          name: hr20-universal-jd-${{ github.sha }}
           path: |
             bin/HR20_universal_jd/hr20.hex
             bin/HR20_universal_jd/hr20.eep
