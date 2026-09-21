@@ -628,6 +628,7 @@ void COM_commad_parse(void)
 			COM_print_debug(1);
 			c = '\0';
 			break;
+#if UART_REBOOT_COMMAND
 		case 'B':
 		{
 			if (COM_hex_parse(2 * 2) != '\0')
@@ -645,6 +646,7 @@ void COM_commad_parse(void)
 			}
 		}
 		break;
+#endif
 		case 'M':
 			if (COM_hex_parse(1 * 2) != '\0')
 			{
