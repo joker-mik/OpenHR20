@@ -580,6 +580,7 @@ void COM_commad_parse(void)
 				print_hexXX(0xff);
 			}
 			break;
+#if UART_TIMER_COMMANDS
 		case 'R':
 		case 'W':
 			if (c == 'R')
@@ -606,6 +607,7 @@ void COM_commad_parse(void)
 			print_hexXXXX(eeprom_timers_read_raw(
 					      timers_get_raw_index((com_hex[0] >> 4), (com_hex[0] & 0xf))));
 			break;
+#endif
 		case 'Y':
 			if (COM_hex_parse(3 * 2) != '\0')
 			{
