@@ -671,6 +671,7 @@ void COM_commad_parse(void)
 			CTL_set_temp(com_hex[0]);
 			COM_print_debug(1);
 			break;
+#if UART_LOCK_COMMAND
 		case 'L':
 			if (COM_hex_parse(1 * 2) != '\0')
 			{
@@ -682,6 +683,7 @@ void COM_commad_parse(void)
 			}
 			print_hexXX(menu_locked);
 			break;
+#endif
 #endif
 		//case '\n':
 		//case '\0':
