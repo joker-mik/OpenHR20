@@ -76,15 +76,16 @@ HR20_universal_jd:
 		OBJDIR=$@ \
 		RFM=1 \
 		RFM_WIRE=JD_INTERNAL \
-		RFM_TUNING=1 \
+		RFM_TUNING=0 \
 		RFM_RUNTIME_DETECT=1 \
 		ENABLE_UART=1 \
+		UART_VERBOSE_STATUS=0 \
+		ENABLE_WATCH_COMMAND=0 \
 		REMOTE_SETTING_ONLY=0 \
 		HW_WINDOW_DETECTION=0 \
 		WINDOW_DETECTION_RUNTIME=1 \
 		GC_SECTIONS=1 \
 		LTO=1 \
-		FLAGS="-fno-inline-small-functions -fno-inline-functions-called-once" \
 		REV=-DREVISION=\\\"$(REV)\\\"
 
 HR20_rfm_int_sww:
