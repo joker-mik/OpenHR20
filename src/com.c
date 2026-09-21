@@ -327,7 +327,7 @@ void COM_init(void)
  ******************************************************************************/
 void COM_print_debug(uint8_t type)
 {
-#ifdef COM_UART
+#if defined(COM_UART) && UART_VERBOSE_STATUS
 	print_s_p(PSTR("D: "));
 	print_hexXX(RTC_GetDayOfWeek() + 0xd0);
 	COM_putchar(' ');
@@ -533,6 +533,7 @@ void COM_commad_parse(void)
 			}
 			c = '\0';
 			break;
+#if ENABLE_WATCH_COMMAND
 		case 'T':
 		{
 			if (COM_hex_parse(1 * 2) != '\0')
@@ -543,6 +544,7 @@ void COM_commad_parse(void)
 			print_hexXXXX(watch(com_hex[0]));
 		}
 		break;
+#endif
 		case 'G':
 		case 'S':
 			if (c == 'G')
@@ -724,6 +726,7 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 		case 'D':
 			COM_print_debug(2);
 			break;
+#if ENABLE_WATCH_COMMAND
 		case 'T':
 			if ((uint8_t)(rfm_framepos - pos) < 1)
 			{
@@ -733,6 +736,7 @@ void COM_wireless_command_parse(uint8_t *rfm_framebuf, uint8_t rfm_framepos)
 			COM_wireless_word(watch(rfm_framebuf[pos]));
 			pos++;
 			break;
+#endif
 		case 'G':
 		case 'S':
 			if ((uint8_t)(rfm_framepos - pos) < ((c == 'S') ? 2 : 1))
