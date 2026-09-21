@@ -37,7 +37,7 @@
 uint16_t watch(uint8_t addr);
 
 #if DEBUG_MOTOR_COUNTER
-#define WATCH_N (13)
-#else
 #define WATCH_N (11)
+#else
+#define WATCH_N (9)
 #endif

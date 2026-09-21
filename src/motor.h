@@ -106,8 +106,6 @@ void MOTOR_Goto(uint8_t);                                       // Goto position
 #define MOTOR_IsCalibrated() (MOTOR_calibration_step == 0)      // is motor successful calibrated?
 void MOTOR_updateCalibration(uint8_t cal_type);                 // reset the calibration
 uint8_t MOTOR_GetPosPercent(void);                              // get percental position of motor (0-100%)
-uint8_t MOTOR_StartCloseReference(void);                           // re-reference physical closed end stop
-uint8_t MOTOR_CloseReferenceActive(void);
 void MOTOR_timer_stop(void);
 void MOTOR_timer_pulse(void);
 void MOTOR_interrupt(uint8_t pine);
@@ -121,6 +119,4 @@ extern int8_t MOTOR_calibration_step;
 extern uint16_t motor_diag_count;
 extern motor_dir_t MOTOR_Dir;           //!< actual direction
 extern volatile uint8_t MOTOR_PosOvershoot;
-extern uint8_t MOTOR_close_reference_count;
-extern int16_t MOTOR_last_close_reference_delta;
 extern uint32_t MOTOR_counter;          //!< count volume of motor pulses for dianostic

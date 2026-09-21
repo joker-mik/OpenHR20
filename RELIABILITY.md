@@ -13,27 +13,13 @@ This fork carries reliability improvements across the supported thermostat targe
 
 The first motor movement is delayed until four accepted battery ADC samples are available. The existing ADC noise filter still decides whether an individual conversion is accepted.
 
-## Automatic close re-reference
+## Motor calibration and battery use
 
-`MOTOR_AUTO_RESYNC=1` is enabled by default. A close re-reference is requested only after all of these conditions have remained true for 15 minutes:
+The additional time-based close re-reference has been removed. It caused extra motor travel from the normal minimum valve position toward the mechanical zero and back, which is undesirable for battery life.
 
-- the motor is calibrated and stopped;
-- no motor, mounting, battery-warning or battery-low error is active;
-- window-open mode is inactive;
-- the requested valve position is at `valve_min` or below;
-- room temperature is at least 1.00 C above the requested temperature.
+The existing weekly valve-protection calibration remains the only periodic automatic zero search. It runs on Saturday at 10:00 when no battery warning/low error is active.
 
-The motor drives toward the physical closed end stop using the existing pulse/end-stop timeout. The calibrated full travel is retained and only the zero reference is corrected. A 12-hour cooldown prevents frequent homing.
-
-A stop far away from the expected zero region is treated as a motor error rather than a successful reference, so a jammed valve cannot silently redefine zero.
-
-Diagnostics are RAM-only and add no EEPROM wear:
-
-- `T09`: successful automatic close references since boot;
-- `T0a`: signed 16-bit position correction from the latest reference (two's-complement hex).
-
-The normal `D` UART status line additionally prints actual motor percent (`P`) and re-reference count (`R`).
-
+Motor-calibration hardening remains in place: stored manual travel and completed calibration results must stay within the plausible impulse range. Implausible values are rejected with a motor error instead of being accepted as valid travel.
 ## EEPROM layout guard
 
 OpenHR20 historically stores independent top-level objects in `.eeprom` and relies on their addresses. Compiler/linker changes can silently produce an incompatible EEPROM image.
