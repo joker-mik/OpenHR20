@@ -280,12 +280,12 @@ static void print_version(bool sync)
 	const char *s = (PSTR(VERSION_STRING "\n"));
 	char c;
 
-#ifdef COM_UART
+#if defined(COM_UART) && UART_VERSION_OUTPUT
 	COM_putchar('V');
 #endif
 	for (c = pgm_read_byte(s); c; ++s, c = pgm_read_byte(s))
 	{
-#ifdef COM_UART
+#if defined(COM_UART) && UART_VERSION_OUTPUT
 		COM_putchar(c);
 #endif
 #if RFM == 1
@@ -312,9 +312,13 @@ static void COM_wireless_word(uint16_t w);
 void COM_init(void)
 {
 #ifdef COM_UART
+#if UART_VERSION_OUTPUT
 	print_version(false);
+#endif
 	UART_init();
+#if UART_VERSION_OUTPUT
 	COM_flush();
+#endif
 #endif
 }
 
@@ -516,6 +520,7 @@ void COM_commad_parse(void)
 	{
 		switch (c = COM_getchar())
 		{
+#if UART_VERSION_OUTPUT
 		case 'V':
 			if (COM_getchar() == '\n')
 			{
@@ -523,6 +528,7 @@ void COM_commad_parse(void)
 			}
 			c = '\0';
 			break;
+#endif
 #if ENABLE_LOCAL_COMMANDS
 #if UART_VERBOSE_STATUS
 		case 'D':
